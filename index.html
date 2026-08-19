@@ -1,0 +1,612 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Orbit · Carlosity Teaches</title>
+<meta name="description" content="A pomodoro timer that logs focus time per task, built for Carlosity Teaches.">
+<meta name="theme-color" content="#0E1730">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Orbit">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#0E1730;
+    --panel:#16224260;
+    --panel-solid:#182545;
+    --line:#2A3A66;
+    --chalk:#EAF0FF;
+    --muted:#8494B8;
+    --burn:#FF9F45;
+    --coast:#5FD8C4;
+    --danger:#FF7A7A;
+    --r:14px;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{
+    background:
+      radial-gradient(1200px 700px at 78% -12%, #1D2B52 0%, rgba(29,43,82,0) 62%),
+      radial-gradient(900px 600px at 0% 110%, #17233F 0%, rgba(23,35,63,0) 60%),
+      var(--ink);
+    color:var(--chalk);
+    font-family:"IBM Plex Sans",system-ui,sans-serif;
+    min-height:100vh;
+    -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:1080px;margin:0 auto;padding:22px 20px 56px}
+
+  /* ---------- header ---------- */
+  .top{display:flex;align-items:center;justify-content:space-between;gap:16px;padding-bottom:20px}
+  .brand{display:flex;align-items:center;gap:11px;min-width:0}
+  .brand svg{flex:none}
+  .brand-name{
+    font-family:"Chakra Petch",sans-serif;font-weight:700;font-size:17px;
+    letter-spacing:.06em;text-transform:uppercase;line-height:1;white-space:nowrap
+  }
+  .brand-sub{
+    font-family:"IBM Plex Mono",monospace;font-size:10.5px;color:var(--muted);
+    letter-spacing:.18em;text-transform:uppercase;margin-top:5px
+  }
+  .today-chip{
+    font-family:"IBM Plex Mono",monospace;font-size:11px;color:var(--muted);
+    letter-spacing:.12em;text-transform:uppercase;text-align:right;line-height:1.6
+  }
+  .today-chip b{display:block;color:var(--chalk);font-size:15px;font-weight:500;letter-spacing:.04em}
+
+  /* ---------- layout ---------- */
+  .grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,368px);gap:20px;align-items:start}
+  .card{
+    background:linear-gradient(180deg,#1A2748 0%,#151F3B 100%);
+    border:1px solid var(--line);border-radius:var(--r);
+  }
+  .col-right{display:flex;flex-direction:column;gap:20px}
+
+  /* ---------- dial ---------- */
+  .dial{padding:26px 20px 22px;display:flex;flex-direction:column;align-items:center;position:relative;overflow:hidden}
+  .phase-tag{
+    font-family:"IBM Plex Mono",monospace;font-size:11px;letter-spacing:.2em;text-transform:uppercase;
+    color:var(--phase,var(--burn));display:flex;align-items:center;gap:8px
+  }
+  .phase-tag i{width:6px;height:6px;border-radius:50%;background:currentColor;display:block}
+  .ring-holder{position:relative;width:min(340px,80vw);aspect-ratio:1/1;margin:14px 0 4px}
+  .ring-holder svg{width:100%;height:100%;display:block;overflow:visible}
+  .track{fill:none;stroke:#25335C;stroke-width:9}
+  .arc{fill:none;stroke:var(--phase,var(--burn));stroke-width:9;stroke-linecap:round;
+       transform:rotate(-90deg);transform-origin:50% 50%;transition:stroke .5s ease}
+  .sat{fill:var(--phase,var(--burn))}
+  .sat-halo{fill:var(--phase,var(--burn));opacity:.18}
+  .slot{fill:#25335C}
+  .slot.on{fill:var(--coast)}
+  .readout{
+    position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;
+    pointer-events:none;text-align:center
+  }
+  .clock{
+    font-family:"Chakra Petch",sans-serif;font-weight:600;font-variant-numeric:tabular-nums;
+    font-size:clamp(52px,13vw,68px);line-height:1;letter-spacing:.01em
+  }
+  .clock-task{
+    margin-top:11px;font-size:12.5px;color:var(--muted);max-width:180px;
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap
+  }
+  .slots-label{
+    font-family:"IBM Plex Mono",monospace;font-size:10px;letter-spacing:.16em;
+    text-transform:uppercase;color:var(--muted);margin-top:2px
+  }
+
+  /* ---------- controls ---------- */
+  .controls{display:flex;gap:10px;margin-top:16px;flex-wrap:wrap;justify-content:center}
+  button{font-family:inherit;cursor:pointer;border-radius:10px;border:1px solid var(--line);
+    background:#1E2C50;color:var(--chalk);transition:background .15s ease,border-color .15s ease,transform .05s ease}
+  button:hover{background:#26365F}
+  button:active{transform:translateY(1px)}
+  button:focus-visible{outline:2px solid var(--coast);outline-offset:2px}
+  .btn-go{
+    padding:13px 40px;font-family:"Chakra Petch",sans-serif;font-weight:600;font-size:15px;
+    letter-spacing:.14em;text-transform:uppercase;color:#101A33;
+    background:var(--phase,var(--burn));border-color:transparent
+  }
+  .btn-go:hover{background:var(--phase,var(--burn));filter:brightness(1.08)}
+  .btn-flat{padding:13px 18px;font-size:13.5px;color:var(--muted)}
+  .btn-flat:hover{color:var(--chalk)}
+
+  /* ---------- panels ---------- */
+  .panel-head{
+    display:flex;align-items:baseline;justify-content:space-between;gap:10px;
+    padding:16px 18px 12px;border-bottom:1px solid var(--line)
+  }
+  .panel-head h2{
+    margin:0;font-family:"IBM Plex Mono",monospace;font-size:11px;font-weight:500;
+    letter-spacing:.2em;text-transform:uppercase;color:var(--muted)
+  }
+  .panel-head span{font-family:"IBM Plex Mono",monospace;font-size:11px;color:var(--muted)}
+
+  .adder{display:flex;gap:8px;padding:14px 18px}
+  input[type=text]{
+    flex:1;min-width:0;font-family:inherit;font-size:14px;color:var(--chalk);
+    background:#111C36;border:1px solid var(--line);border-radius:10px;padding:11px 13px
+  }
+  input[type=text]::placeholder{color:#5F6E92}
+  input:focus-visible{outline:2px solid var(--coast);outline-offset:1px}
+  .adder button{padding:0 16px;font-size:19px;line-height:1;color:var(--chalk)}
+
+  .tasks{list-style:none;margin:0;padding:0 8px 10px;max-height:320px;overflow-y:auto}
+  .task{
+    display:flex;align-items:center;gap:10px;padding:10px 10px;border-radius:10px;cursor:pointer;
+    border:1px solid transparent
+  }
+  .task:hover{background:#1E2C50}
+  .task.active{background:#1E2C50;border-color:var(--burn)}
+  .task.done .task-name{text-decoration:line-through;color:var(--muted)}
+  .tick{
+    flex:none;width:17px;height:17px;border-radius:5px;border:1.5px solid #3A4B78;background:transparent;
+    padding:0;display:grid;place-items:center;color:var(--coast);font-size:11px;line-height:1
+  }
+  .task.done .tick{border-color:var(--coast)}
+  .task-name{flex:1;min-width:0;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .task-meta{
+    font-family:"IBM Plex Mono",monospace;font-size:11px;color:var(--muted);
+    white-space:nowrap;letter-spacing:.02em
+  }
+  .kill{flex:none;width:24px;height:24px;padding:0;border-color:transparent;background:transparent;
+    color:#5F6E92;font-size:15px;line-height:1}
+  .kill:hover{color:var(--danger);background:transparent}
+  .empty{padding:6px 18px 20px;font-size:13px;color:var(--muted);line-height:1.55}
+
+  /* ---------- stats ---------- */
+  .stat-main{padding:18px}
+  .big{
+    font-family:"Chakra Petch",sans-serif;font-weight:600;font-size:40px;line-height:1;
+    font-variant-numeric:tabular-nums
+  }
+  .big small{font-size:19px;font-weight:500;color:var(--muted);margin-left:2px}
+  .stat-cap{
+    font-family:"IBM Plex Mono",monospace;font-size:10.5px;letter-spacing:.16em;
+    text-transform:uppercase;color:var(--muted);margin-top:9px
+  }
+  .split{display:grid;grid-template-columns:1fr 1fr;border-top:1px solid var(--line)}
+  .split div{padding:14px 18px}
+  .split div+div{border-left:1px solid var(--line)}
+  .split b{display:block;font-family:"Chakra Petch",sans-serif;font-size:20px;font-weight:600;font-variant-numeric:tabular-nums}
+  .split span{font-family:"IBM Plex Mono",monospace;font-size:10.5px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);display:block;margin-top:6px}
+
+  /* ---------- settings ---------- */
+  details{margin-top:20px;border:1px solid var(--line);border-radius:var(--r);background:#141E3A}
+  summary{
+    list-style:none;cursor:pointer;padding:14px 18px;
+    font-family:"IBM Plex Mono",monospace;font-size:11px;letter-spacing:.2em;
+    text-transform:uppercase;color:var(--muted)
+  }
+  summary::-webkit-details-marker{display:none}
+  summary:hover{color:var(--chalk)}
+  .set-body{padding:4px 18px 18px;display:flex;flex-wrap:wrap;gap:16px 22px;align-items:flex-end}
+  .field{display:flex;flex-direction:column;gap:7px}
+  .field label{font-family:"IBM Plex Mono",monospace;font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+  .field input[type=number]{
+    width:82px;font-family:"Chakra Petch",sans-serif;font-size:15px;color:var(--chalk);
+    background:#111C36;border:1px solid var(--line);border-radius:9px;padding:9px 11px
+  }
+  .toggles{display:flex;gap:18px;flex-wrap:wrap;padding-top:2px}
+  .toggles label{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--muted);cursor:pointer}
+  .toggles input{accent-color:var(--coast);width:15px;height:15px}
+  .reset-all{margin-left:auto;padding:10px 14px;font-size:12.5px;color:var(--danger);border-color:#432B3F}
+  .reset-all:hover{background:#2B1B2B}
+
+  .foot{
+    margin-top:26px;text-align:center;font-family:"IBM Plex Mono",monospace;
+    font-size:10.5px;letter-spacing:.16em;text-transform:uppercase;color:#55648A
+  }
+
+  @media (max-width:860px){
+    .grid{grid-template-columns:1fr}
+    .today-chip{display:none}
+  }
+  @media (prefers-reduced-motion:reduce){
+    *{animation:none!important;transition:none!important}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="top">
+    <div class="brand">
+      <svg width="34" height="34" viewBox="0 0 34 34" aria-hidden="true">
+        <ellipse cx="17" cy="17" rx="15.2" ry="7.2" fill="none" stroke="#FF9F45" stroke-width="1.6" transform="rotate(-28 17 17)"/>
+        <circle cx="17" cy="17" r="5.4" fill="#5FD8C4"/>
+        <circle cx="29.4" cy="10.6" r="2.5" fill="#FF9F45"/>
+      </svg>
+      <div>
+        <div class="brand-name">Carlosity Teaches</div>
+        <div class="brand-sub">Orbit · focus timer</div>
+      </div>
+    </div>
+    <div class="today-chip">
+      Logged today
+      <b id="chipToday">0h 00m</b>
+    </div>
+  </header>
+
+  <div class="grid">
+
+    <!-- ============ DIAL ============ -->
+    <section class="card dial">
+      <div class="phase-tag" id="phaseTag"><i></i><span>Focus</span></div>
+
+      <div class="ring-holder">
+        <svg viewBox="0 0 340 340" role="img" aria-labelledby="ringLabel">
+          <title id="ringLabel">Session progress dial</title>
+          <g id="slots"></g>
+          <circle class="track" cx="170" cy="170" r="132"></circle>
+          <circle class="arc" id="arc" cx="170" cy="170" r="132"></circle>
+          <circle class="sat-halo" id="satHalo" cx="170" cy="38" r="13"></circle>
+          <circle class="sat" id="sat" cx="170" cy="38" r="6"></circle>
+        </svg>
+        <div class="readout">
+          <div class="clock" id="clock">25:00</div>
+          <div class="clock-task" id="clockTask">No task selected</div>
+        </div>
+      </div>
+
+      <div class="slots-label" id="slotsLabel">0 of 12 slots filled today</div>
+
+      <div class="controls">
+        <button class="btn-go" id="go">Start</button>
+        <button class="btn-flat" id="reset">Reset</button>
+        <button class="btn-flat" id="skip">Skip ahead</button>
+      </div>
+    </section>
+
+    <!-- ============ RIGHT COLUMN ============ -->
+    <div class="col-right">
+
+      <section class="card">
+        <div class="panel-head">
+          <h2>Tasks</h2>
+          <span id="taskCount">0 open</span>
+        </div>
+        <div class="adder">
+          <input type="text" id="newTask" maxlength="70" placeholder="What are you working on?" aria-label="New task name">
+          <button id="addTask" aria-label="Add task">+</button>
+        </div>
+        <ul class="tasks" id="taskList"></ul>
+        <p class="empty" id="taskEmpty">Add a task, then tap it to make it active. Focus time and pomodoros get logged to whichever task is highlighted.</p>
+      </section>
+
+      <section class="card">
+        <div class="panel-head"><h2>Focus logged</h2><span>all time</span></div>
+        <div class="stat-main">
+          <div class="big" id="totalBig">0<small>h</small> 00<small>m</small></div>
+          <div class="stat-cap" id="totalPomsCap">0 pomodoros completed</div>
+        </div>
+        <div class="split">
+          <div><b id="statToday">0h 00m</b><span>Today</span></div>
+          <div><b id="statTodayPoms">0</b><span>Today's poms</span></div>
+        </div>
+      </section>
+
+    </div>
+  </div>
+
+  <details>
+    <summary>Settings</summary>
+    <div class="set-body">
+      <div class="field"><label for="sWork">Focus (min)</label><input type="number" id="sWork" min="1" max="180" value="25"></div>
+      <div class="field"><label for="sShort">Short break</label><input type="number" id="sShort" min="1" max="60" value="5"></div>
+      <div class="field"><label for="sLong">Long break</label><input type="number" id="sLong" min="1" max="90" value="15"></div>
+      <div class="field"><label for="sEvery">Long break every</label><input type="number" id="sEvery" min="2" max="12" value="4"></div>
+      <div class="toggles">
+        <label><input type="checkbox" id="sSound" checked> Chime</label>
+        <label><input type="checkbox" id="sAuto"> Auto start next</label>
+        <label><input type="checkbox" id="sNotify"> Notifications</label>
+      </div>
+      <button class="reset-all" id="wipe">Clear all data</button>
+    </div>
+  </details>
+
+  <p class="foot">Carlosity Teaches · math + physics</p>
+</div>
+
+<script>
+/* ---------------- storage (falls back to memory if blocked) ---------------- */
+const KEY = "carlosity.orbit.v1";
+const mem = {};
+const store = {
+  read(){
+    try { const raw = localStorage.getItem(KEY); return raw ? JSON.parse(raw) : null; }
+    catch(e){ return mem[KEY] || null; }
+  },
+  write(v){
+    try { localStorage.setItem(KEY, JSON.stringify(v)); }
+    catch(e){ mem[KEY] = v; }
+  }
+};
+
+const blank = {
+  settings:{work:25, short:5, long:15, every:4, sound:true, auto:false, notify:false},
+  totalSeconds:0, totalPoms:0,
+  byDate:{}, pomsByDate:{},
+  tasks:[], activeId:null, inCycle:0
+};
+let S = Object.assign({}, blank, store.read() || {});
+S.settings = Object.assign({}, blank.settings, S.settings || {});
+const save = () => store.write(S);
+
+/* ---------------- runtime ---------------- */
+let phase = "work";          // work | short | long
+let remaining = S.settings.work * 60;
+let running = false;
+let lastStamp = 0;
+let carry = 0;               // sub-second focus time not yet banked
+
+const $ = id => document.getElementById(id);
+const todayKey = () => {
+  const d = new Date();
+  return d.getFullYear() + "-" + String(d.getMonth()+1).padStart(2,"0") + "-" + String(d.getDate()).padStart(2,"0");
+};
+const phaseLen = p => (p === "work" ? S.settings.work : p === "short" ? S.settings.short : S.settings.long) * 60;
+const clean = n => Math.max(0, Math.floor(n));
+
+function hm(sec){
+  const h = Math.floor(sec/3600), m = Math.floor((sec%3600)/60);
+  return h + "h " + String(m).padStart(2,"0") + "m";
+}
+function hmRich(sec){
+  const h = Math.floor(sec/3600), m = Math.floor((sec%3600)/60);
+  return h + "<small>h</small> " + String(m).padStart(2,"0") + "<small>m</small>";
+}
+function mmss(sec){
+  const m = Math.floor(sec/60), s = Math.floor(sec%60);
+  return String(m).padStart(2,"0") + ":" + String(s).padStart(2,"0");
+}
+const activeTask = () => S.tasks.find(t => t.id === S.activeId) || null;
+
+/* ---------------- dial geometry ---------------- */
+const R = 132, C = 2 * Math.PI * R;
+$("arc").style.strokeDasharray = C;
+
+(function buildSlots(){
+  const g = $("slots");
+  for(let i=0;i<12;i++){
+    const a = (-90 + i*30) * Math.PI/180;
+    const c = document.createElementNS("http://www.w3.org/2000/svg","circle");
+    c.setAttribute("cx", 170 + Math.cos(a)*156);
+    c.setAttribute("cy", 170 + Math.sin(a)*156);
+    c.setAttribute("r", 3.2);
+    c.setAttribute("class","slot");
+    g.appendChild(c);
+  }
+})();
+
+/* ---------------- rendering ---------------- */
+function paintDial(){
+  const len = phaseLen(phase);
+  const done = Math.min(1, Math.max(0, 1 - remaining/len));
+  const color = phase === "work" ? "var(--burn)" : "var(--coast)";
+  document.querySelector(".dial").style.setProperty("--phase", color);
+
+  $("arc").style.strokeDashoffset = C * (1 - done);
+  const a = (-90 + done*360) * Math.PI/180;
+  const x = 170 + Math.cos(a)*R, y = 170 + Math.sin(a)*R;
+  $("sat").setAttribute("cx",x); $("sat").setAttribute("cy",y);
+  $("satHalo").setAttribute("cx",x); $("satHalo").setAttribute("cy",y);
+
+  $("clock").textContent = mmss(remaining);
+  const label = phase === "work" ? "Focus" : phase === "short" ? "Short break" : "Long break";
+  $("phaseTag").querySelector("span").textContent = label;
+
+  const t = activeTask();
+  $("clockTask").textContent = phase === "work"
+    ? (t ? t.name : "No task selected")
+    : "Step away from the desk";
+
+  $("go").textContent = running ? "Pause" : (remaining < phaseLen(phase) ? "Resume" : "Start");
+  document.title = (running ? mmss(remaining) + " · " : "") + label + " · Orbit";
+}
+
+function paintSlots(){
+  const n = S.pomsByDate[todayKey()] || 0;
+  const filled = Math.min(12, n);
+  document.querySelectorAll(".slot").forEach((el,i) => el.classList.toggle("on", i < filled));
+  $("slotsLabel").textContent = n > 12
+    ? n + " pomodoros today, dial wrapped past 12"
+    : filled + " of 12 slots filled today";
+}
+
+function paintTasks(){
+  const list = $("taskList");
+  list.innerHTML = "";
+  S.tasks.forEach(t => {
+    const li = document.createElement("li");
+    li.className = "task" + (t.id === S.activeId ? " active" : "") + (t.done ? " done" : "");
+    li.tabIndex = 0;
+
+    const tick = document.createElement("button");
+    tick.className = "tick"; tick.textContent = t.done ? "✓" : "";
+    tick.setAttribute("aria-label", t.done ? "Mark not done" : "Mark done");
+    tick.onclick = e => { e.stopPropagation(); t.done = !t.done; save(); paintTasks(); };
+
+    const name = document.createElement("div");
+    name.className = "task-name"; name.textContent = t.name;
+
+    const meta = document.createElement("div");
+    meta.className = "task-meta";
+    meta.textContent = t.poms + "◍  " + hm(t.seconds);
+
+    const kill = document.createElement("button");
+    kill.className = "kill"; kill.textContent = "×";
+    kill.setAttribute("aria-label", "Delete task");
+    kill.onclick = e => {
+      e.stopPropagation();
+      S.tasks = S.tasks.filter(x => x.id !== t.id);
+      if(S.activeId === t.id) S.activeId = null;
+      save(); paintTasks(); paintDial();
+    };
+
+    const pick = () => { S.activeId = (S.activeId === t.id ? null : t.id); save(); paintTasks(); paintDial(); };
+    li.onclick = pick;
+    li.onkeydown = e => { if(e.key === "Enter" || e.key === " "){ e.preventDefault(); pick(); } };
+
+    li.append(tick, name, meta, kill);
+    list.appendChild(li);
+  });
+
+  const open = S.tasks.filter(t => !t.done).length;
+  $("taskCount").textContent = open + (open === 1 ? " open" : " open");
+  $("taskEmpty").style.display = S.tasks.length ? "none" : "block";
+}
+
+function paintStats(){
+  const k = todayKey();
+  $("totalBig").innerHTML = hmRich(S.totalSeconds);
+  $("totalPomsCap").textContent = S.totalPoms + (S.totalPoms === 1 ? " pomodoro completed" : " pomodoros completed");
+  $("statToday").textContent = hm(S.byDate[k] || 0);
+  $("statTodayPoms").textContent = S.pomsByDate[k] || 0;
+  $("chipToday").textContent = hm(S.byDate[k] || 0);
+}
+
+const paintAll = () => { paintDial(); paintSlots(); paintTasks(); paintStats(); };
+
+/* ---------------- timer engine ---------------- */
+function bank(seconds){
+  if(phase !== "work" || seconds <= 0) return;
+  carry += seconds;
+  const whole = Math.floor(carry);
+  if(whole < 1) return;
+  carry -= whole;
+  const k = todayKey();
+  S.totalSeconds += whole;
+  S.byDate[k] = (S.byDate[k] || 0) + whole;
+  const t = activeTask();
+  if(t) t.seconds += whole;
+}
+
+function loop(){
+  if(!running) return;
+  const now = Date.now();
+  const delta = (now - lastStamp) / 1000;
+  lastStamp = now;
+
+  bank(Math.min(delta, remaining));
+  remaining -= delta;
+
+  if(remaining <= 0){ finishPhase(); }
+  else { paintDial(); paintStats(); }
+}
+setInterval(loop, 250);
+
+function finishPhase(){
+  const wasWork = phase === "work";
+  if(wasWork){
+    const k = todayKey();
+    S.totalPoms += 1;
+    S.pomsByDate[k] = (S.pomsByDate[k] || 0) + 1;
+    S.inCycle += 1;
+    const t = activeTask();
+    if(t) t.poms += 1;
+    phase = (S.inCycle % S.settings.every === 0) ? "long" : "short";
+  } else {
+    phase = "work";
+  }
+  remaining = phaseLen(phase);
+  running = !!S.settings.auto;
+  lastStamp = Date.now();
+  carry = 0;
+  save();
+  chime(wasWork);
+  ping(wasWork ? "Pomodoro logged. Time for a break." : "Break over. Back to it.");
+  paintAll();
+}
+
+/* ---------------- alerts ---------------- */
+let ac = null;
+function chime(up){
+  if(!S.settings.sound) return;
+  try{
+    ac = ac || new (window.AudioContext || window.webkitAudioContext)();
+    const notes = up ? [523.25, 659.25, 783.99] : [659.25, 523.25];
+    notes.forEach((f,i) => {
+      const o = ac.createOscillator(), g = ac.createGain();
+      o.type = "sine"; o.frequency.value = f;
+      const t0 = ac.currentTime + i*0.16;
+      g.gain.setValueAtTime(0.0001, t0);
+      g.gain.exponentialRampToValueAtTime(0.22, t0+0.02);
+      g.gain.exponentialRampToValueAtTime(0.0001, t0+0.42);
+      o.connect(g); g.connect(ac.destination);
+      o.start(t0); o.stop(t0+0.45);
+    });
+  }catch(e){}
+}
+function ping(text){
+  if(!S.settings.notify) return;
+  try{ if(Notification.permission === "granted") new Notification("Orbit", {body:text, icon:"icon-192.png"}); }catch(e){}
+}
+
+/* ---------------- controls ---------------- */
+$("go").onclick = () => {
+  running = !running;
+  lastStamp = Date.now();
+  if(running && ac && ac.state === "suspended") ac.resume();
+  paintDial();
+};
+$("reset").onclick = () => {
+  running = false; remaining = phaseLen(phase); carry = 0; paintDial();
+};
+$("skip").onclick = () => { remaining = 0; finishPhase(); };
+
+$("addTask").onclick = addTask;
+$("newTask").onkeydown = e => { if(e.key === "Enter") addTask(); };
+function addTask(){
+  const box = $("newTask");
+  const name = box.value.trim();
+  if(!name) return;
+  const t = {id:Date.now().toString(36), name, seconds:0, poms:0, done:false};
+  S.tasks.push(t);
+  if(!S.activeId) S.activeId = t.id;
+  box.value = "";
+  save(); paintTasks(); paintDial();
+}
+
+/* ---------------- settings ---------------- */
+const bindNum = (id, key) => {
+  const el = $(id);
+  el.value = S.settings[key];
+  el.onchange = () => {
+    const v = clean(el.value) || blank.settings[key];
+    S.settings[key] = v; el.value = v;
+    if(!running) remaining = phaseLen(phase);
+    save(); paintDial();
+  };
+};
+bindNum("sWork","work"); bindNum("sShort","short"); bindNum("sLong","long"); bindNum("sEvery","every");
+
+$("sSound").checked = S.settings.sound;
+$("sSound").onchange = e => { S.settings.sound = e.target.checked; save(); };
+$("sAuto").checked = S.settings.auto;
+$("sAuto").onchange = e => { S.settings.auto = e.target.checked; save(); };
+$("sNotify").checked = S.settings.notify;
+$("sNotify").onchange = e => {
+  S.settings.notify = e.target.checked; save();
+  if(e.target.checked){ try{ Notification.requestPermission(); }catch(err){} }
+};
+$("wipe").onclick = () => {
+  if(!confirm("Clear every task and all logged focus time? This cannot be undone.")) return;
+  S = JSON.parse(JSON.stringify(blank));
+  phase = "work"; running = false; remaining = phaseLen("work"); carry = 0;
+  save(); paintAll();
+};
+
+/* ---------------- boot ---------------- */
+paintAll();
+if("serviceWorker" in navigator){
+  window.addEventListener("load", () => navigator.serviceWorker.register("sw.js").catch(()=>{}));
+}
+</script>
+</body>
+</html>
