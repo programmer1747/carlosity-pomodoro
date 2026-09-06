@@ -198,6 +198,54 @@
   .reset-all{margin-left:auto;padding:10px 14px;font-size:12.5px;color:var(--danger);border-color:#432B3F}
   .reset-all:hover{background:#2B1B2B}
 
+  /* ---------- difficulty + planner ---------- */
+  .diff{
+    flex:none;width:23px;height:23px;padding:0;border-radius:7px;background:#111C36;
+    font-family:"IBM Plex Mono",monospace;font-size:11px;font-weight:500;line-height:1
+  }
+  .diff.d1{color:#8FE3D2;border-color:#2E5751}
+  .diff.d2{color:#FFC48A;border-color:#5C4630}
+  .diff.d3{color:#FF9F9F;border-color:#5F3340}
+  .hint{margin:0;padding:2px 18px 16px;font-size:12px;color:var(--muted);line-height:1.6}
+  .hint b{color:var(--chalk);font-weight:600}
+
+  .plan-form{display:flex;flex-wrap:wrap;gap:14px 18px;align-items:flex-end;padding:14px 18px 12px}
+  .chips{display:flex;gap:6px;flex-wrap:wrap}
+  .chip{
+    padding:8px 11px;font-family:"IBM Plex Mono",monospace;font-size:11.5px;
+    letter-spacing:.06em;color:var(--muted);border-radius:9px
+  }
+  .chip:hover{color:var(--chalk)}
+  .plan-acts{display:flex;gap:8px;padding:0 18px 14px;align-items:center}
+  .btn-plan{
+    padding:11px 18px;font-family:"Chakra Petch",sans-serif;font-weight:600;font-size:13px;
+    letter-spacing:.12em;text-transform:uppercase;color:#101A33;
+    background:var(--coast);border-color:transparent
+  }
+  .btn-plan:hover{background:var(--coast);filter:brightness(1.08)}
+  .plan-list{list-style:none;margin:0;padding:0 8px 6px;max-height:286px;overflow-y:auto}
+  .seg{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:9px;border:1px solid transparent}
+  .seg.now{background:#1E2C50;border-color:var(--burn)}
+  .seg.past{opacity:.4}
+  .seg-dot{flex:none;width:8px;height:8px;border-radius:50%;background:var(--burn)}
+  .seg.brk .seg-dot{background:var(--coast)}
+  .seg-name{flex:1;min-width:0;font-size:13.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .seg.brk .seg-name{color:var(--muted)}
+  .seg-min{font-family:"IBM Plex Mono",monospace;font-size:11.5px;color:var(--muted)}
+  .plan-sum{
+    margin:0;padding:8px 18px 16px;font-family:"IBM Plex Mono",monospace;font-size:11px;
+    color:var(--muted);line-height:1.75;letter-spacing:.03em
+  }
+  .plan-sum.warn{color:var(--burn)}
+
+  /* ---------- install ---------- */
+  .top-right{display:flex;align-items:center;gap:14px}
+  .install{
+    padding:9px 14px;font-family:"IBM Plex Mono",monospace;font-size:11px;
+    letter-spacing:.12em;text-transform:uppercase;color:var(--coast);border-color:#2E5751
+  }
+  .install:hover{background:#1B3B39;color:var(--chalk)}
+
   .foot{
     margin-top:26px;text-align:center;font-family:"IBM Plex Mono",monospace;
     font-size:10.5px;letter-spacing:.16em;text-transform:uppercase;color:#55648A
@@ -227,9 +275,12 @@
         <div class="brand-sub">Orbit · focus timer</div>
       </div>
     </div>
-    <div class="today-chip">
-      Logged today
-      <b id="chipToday">0h 00m</b>
+    <div class="top-right">
+      <button class="install" id="install" hidden>Install app</button>
+      <div class="today-chip">
+        Logged today
+        <b id="chipToday">0h 00m</b>
+      </div>
     </div>
   </header>
 
@@ -277,6 +328,32 @@
         </div>
         <ul class="tasks" id="taskList"></ul>
         <p class="empty" id="taskEmpty">Add a task, then tap it to make it active. Focus time and pomodoros get logged to whichever task is highlighted.</p>
+        <p class="hint">Tap <b>L</b>, <b>M</b> or <b>H</b> to set how hard a task is. Heavier tasks get longer blocks and a bigger share of the time when Orbit plans a session.</p>
+      </section>
+
+      <section class="card">
+        <div class="panel-head">
+          <h2>Session plan</h2>
+          <span id="planTag">off</span>
+        </div>
+        <div class="plan-form">
+          <div class="field">
+            <label for="budget">Time I have (min)</label>
+            <input type="number" id="budget" min="10" max="720" value="90">
+          </div>
+          <div class="chips" id="chips">
+            <button class="chip" data-min="30">30m</button>
+            <button class="chip" data-min="60">1h</button>
+            <button class="chip" data-min="90">1h 30</button>
+            <button class="chip" data-min="120">2h</button>
+          </div>
+        </div>
+        <div class="plan-acts">
+          <button class="btn-plan" id="makePlan">Plan my time</button>
+          <button class="btn-flat" id="dropPlan" hidden>Clear plan</button>
+        </div>
+        <ul class="plan-list" id="planList"></ul>
+        <p class="plan-sum" id="planSum"></p>
       </section>
 
       <section class="card">
@@ -332,10 +409,15 @@ const blank = {
   settings:{work:25, short:5, long:15, every:4, sound:true, auto:false, notify:false},
   totalSeconds:0, totalPoms:0,
   byDate:{}, pomsByDate:{},
-  tasks:[], activeId:null, inCycle:0
+  tasks:[], activeId:null, inCycle:0,
+  plan:null
 };
 let S = Object.assign({}, blank, store.read() || {});
 S.settings = Object.assign({}, blank.settings, S.settings || {});
+if(!Array.isArray(S.tasks)) S.tasks = [];
+// tasks made before difficulty existed land in the middle
+S.tasks.forEach(t => { if(t.diff !== 1 && t.diff !== 2 && t.diff !== 3) t.diff = 2; });
+if(S.plan && (!Array.isArray(S.plan.segs) || S.plan.i >= S.plan.segs.length)) S.plan = null;
 const save = () => store.write(S);
 
 /* ---------------- runtime ---------------- */
@@ -367,6 +449,101 @@ function mmss(sec){
 }
 const activeTask = () => S.tasks.find(t => t.id === S.activeId) || null;
 
+/* ---------------- difficulty + planning ----------------
+   Block length and a task's share of the budget both come from its difficulty,
+   scaled off whatever focus length is set, so the settings still mean something. */
+const DIFF = {
+  1:{tag:"L", name:"Light",  weight:1,   block:0.6, brk:0.8},
+  2:{tag:"M", name:"Medium", weight:2,   block:1,   brk:1},
+  3:{tag:"H", name:"Heavy",  weight:3.2, block:1.7, brk:1.6}
+};
+const MIN_BLOCK = 10;    // minutes, below this a focus block is not worth scheduling
+const MAX_SEGS  = 60;
+const MAX_BUDGET = 720;
+
+const blockMin = d => Math.max(MIN_BLOCK, Math.min(75, Math.round(S.settings.work * DIFF[d].block)));
+const breakMin = d => Math.max(3, Math.min(30, Math.round(S.settings.short * DIFF[d].brk)));
+
+function buildPlan(budget){
+  const pool = S.tasks.filter(t => !t.done);
+  if(!pool.length) return {error:"Add a task first, then Orbit has something to split the time across."};
+  if(budget < MIN_BLOCK) return {error:"Give Orbit at least " + MIN_BLOCK + " minutes to work with."};
+
+  const load = new Map(pool.map(t => [t.id, 0]));   // focus minutes handed out so far
+  const segs = [];
+  let left = Math.min(budget, MAX_BUDGET), blocks = 0;
+
+  while(left >= MIN_BLOCK && segs.length < MAX_SEGS){
+    // whoever is furthest behind their difficulty weight gets the next block
+    let pick = pool[0];
+    for(const t of pool){
+      if(load.get(t.id)/DIFF[t.diff].weight < load.get(pick.id)/DIFF[pick.diff].weight) pick = t;
+    }
+
+    const len = Math.min(blockMin(pick.diff), left);
+    if(len < MIN_BLOCK) break;
+    segs.push({kind:"work", taskId:pick.id, secs:len*60});
+    load.set(pick.id, load.get(pick.id) + len);
+    left -= len;
+    blocks++;
+
+    // a break only earns a slot if a whole block still fits after it
+    if(left < MIN_BLOCK + 2) break;
+    const isLong = blocks % S.settings.every === 0;
+    const bl = Math.min(isLong ? S.settings.long : breakMin(pick.diff), left - MIN_BLOCK);
+    if(bl < 2) continue;
+    segs.push({kind: isLong ? "long" : "short", taskId:null, secs:bl*60});
+    left -= bl;
+  }
+
+  while(segs.length && segs[segs.length-1].kind !== "work") segs.pop();
+  if(!segs.length) return {error:"That is not enough time for a full block."};
+
+  // Whatever is left over is too short to be its own block, so it goes onto the last one
+  // rather than being quietly dropped. Half again is as far as a block gets stretched.
+  const spare = Math.min(budget, MAX_BUDGET) - segs.reduce((a,g) => a + g.secs, 0)/60;
+  if(spare > 0){
+    const last = segs[segs.length-1];
+    last.secs += Math.min(spare, last.secs*0.5) * 60;
+  }
+
+  return {plan:{budget, segs, i:0, made:Date.now()}};
+}
+
+const planSeg = () => (S.plan && S.plan.i < S.plan.segs.length) ? S.plan.segs[S.plan.i] : null;
+const curLen  = () => { const g = planSeg(); return g ? g.secs : phaseLen(phase); };
+const planBlocks = p => p.segs.filter(g => g.kind === "work").length;
+
+function syncToSeg(){
+  const g = planSeg();
+  if(!g) return;
+  phase = g.kind;
+  if(g.kind === "work" && g.taskId) S.activeId = g.taskId;
+  remaining = g.secs;
+  carry = 0;
+}
+
+function dropTaskFromPlan(id){
+  const p = S.plan;
+  if(!p) return;
+
+  // Pull the task's blocks out, then close the gaps: a break only survives if it
+  // still follows a block of work, and the plan never ends on one.
+  const kept = [];
+  let idx = 0;
+  p.segs.forEach((g,i) => {
+    if(g.taskId === id) return;
+    if(g.kind !== "work" && (!kept.length || kept[kept.length-1].kind !== "work")) return;
+    kept.push(g);
+    if(i < p.i) idx++;
+  });
+  while(kept.length && kept[kept.length-1].kind !== "work") kept.pop();
+
+  if(!kept.some(g => g.kind === "work")){ S.plan = null; return; }
+  p.segs = kept;
+  p.i = Math.min(idx, kept.length - 1);
+}
+
 /* ---------------- dial geometry ---------------- */
 const R = 132, C = 2 * Math.PI * R;
 $("arc").style.strokeDasharray = C;
@@ -386,7 +563,7 @@ $("arc").style.strokeDasharray = C;
 
 /* ---------------- rendering ---------------- */
 function paintDial(){
-  const len = phaseLen(phase);
+  const len = curLen();
   const done = Math.min(1, Math.max(0, 1 - remaining/len));
   const color = phase === "work" ? "var(--burn)" : "var(--coast)";
   document.querySelector(".dial").style.setProperty("--phase", color);
@@ -399,15 +576,24 @@ function paintDial(){
 
   $("clock").textContent = mmss(remaining);
   const label = phase === "work" ? "Focus" : phase === "short" ? "Short break" : "Long break";
-  $("phaseTag").querySelector("span").textContent = label;
+  let tag = label;
+  if(S.plan){
+    const total = planBlocks(S.plan);
+    const step  = S.plan.segs.slice(0, S.plan.i + 1).filter(g => g.kind === "work").length;
+    tag += phase === "work"
+      ? " · block " + step + " of " + total
+      : " · " + Math.max(0, total - step) + " to go";
+  }
+  $("phaseTag").querySelector("span").textContent = tag;
 
   const t = activeTask();
   $("clockTask").textContent = phase === "work"
     ? (t ? t.name : "No task selected")
     : "Step away from the desk";
 
-  $("go").textContent = running ? "Pause" : (remaining < phaseLen(phase) ? "Resume" : "Start");
+  $("go").textContent = running ? "Pause" : (remaining < len ? "Resume" : "Start");
   document.title = (running ? mmss(remaining) + " · " : "") + label + " · Orbit";
+  paintPlanSum();
 }
 
 function paintSlots(){
@@ -435,6 +621,17 @@ function paintTasks(){
     const name = document.createElement("div");
     name.className = "task-name"; name.textContent = t.name;
 
+    const diff = document.createElement("button");
+    diff.className = "diff d" + t.diff;
+    diff.textContent = DIFF[t.diff].tag;
+    diff.title = DIFF[t.diff].name + " · tap to change";
+    diff.setAttribute("aria-label", "Difficulty " + DIFF[t.diff].name + ", tap to change");
+    diff.onclick = e => {
+      e.stopPropagation();
+      t.diff = t.diff === 3 ? 1 : t.diff + 1;
+      save(); paintTasks();
+    };
+
     const meta = document.createElement("div");
     meta.className = "task-meta";
     meta.textContent = t.poms + "◍  " + hm(t.seconds);
@@ -444,16 +641,19 @@ function paintTasks(){
     kill.setAttribute("aria-label", "Delete task");
     kill.onclick = e => {
       e.stopPropagation();
+      const wasOnDeck = (planSeg() || {}).taskId === t.id;
       S.tasks = S.tasks.filter(x => x.id !== t.id);
       if(S.activeId === t.id) S.activeId = null;
-      save(); paintTasks(); paintDial();
+      dropTaskFromPlan(t.id);
+      if(wasOnDeck || !running) syncToSeg();
+      save(); paintAll();
     };
 
     const pick = () => { S.activeId = (S.activeId === t.id ? null : t.id); save(); paintTasks(); paintDial(); };
     li.onclick = pick;
     li.onkeydown = e => { if(e.key === "Enter" || e.key === " "){ e.preventDefault(); pick(); } };
 
-    li.append(tick, name, meta, kill);
+    li.append(tick, name, diff, meta, kill);
     list.appendChild(li);
   });
 
@@ -471,7 +671,59 @@ function paintStats(){
   $("chipToday").textContent = hm(S.byDate[k] || 0);
 }
 
-const paintAll = () => { paintDial(); paintSlots(); paintTasks(); paintStats(); };
+function paintPlan(){
+  const p = S.plan, list = $("planList");
+  list.innerHTML = "";
+  $("dropPlan").hidden = !p;
+  $("makePlan").textContent = p ? "Re-plan" : "Plan my time";
+  $("planTag").textContent = p ? planBlocks(p) + " blocks" : "off";
+
+  if(!p){
+    $("planSum").className = "plan-sum";
+    $("planSum").textContent = "Say how long you have. Orbit sizes each block by difficulty and hands the harder tasks more of the time.";
+    return;
+  }
+
+  p.segs.forEach((g,i) => {
+    const li = document.createElement("li");
+    li.className = "seg" + (g.kind === "work" ? "" : " brk") + (i === p.i ? " now" : i < p.i ? " past" : "");
+
+    const dot = document.createElement("i");
+    dot.className = "seg-dot";
+
+    const nm = document.createElement("div");
+    nm.className = "seg-name";
+    const t = g.taskId ? S.tasks.find(x => x.id === g.taskId) : null;
+    nm.textContent = g.kind === "work" ? (t ? t.name : "Focus") : (g.kind === "long" ? "Long break" : "Break");
+
+    const mn = document.createElement("div");
+    mn.className = "seg-min";
+    mn.textContent = Math.round(g.secs/60) + "m";
+
+    li.append(dot, nm, mn);
+    list.appendChild(li);
+  });
+
+  paintPlanSum();
+}
+
+function paintPlanSum(){
+  const p = S.plan, el = $("planSum");
+  if(!p || !el) return;
+  let leftSec = remaining;
+  for(let i = p.i + 1; i < p.segs.length; i++) leftSec += p.segs[i].secs;
+
+  const focus = p.segs.filter(g => g.kind === "work");
+  const focusMin = Math.round(focus.reduce((a,g) => a + g.secs, 0)/60);
+  const end = new Date(Date.now() + leftSec*1000);
+  const h = end.getHours(), m = String(end.getMinutes()).padStart(2,"0");
+
+  el.className = "plan-sum";
+  el.textContent = focus.length + " blocks · " + focusMin + " min of focus · done around "
+    + (((h + 11) % 12) + 1) + ":" + m + " " + (h >= 12 ? "pm" : "am");
+}
+
+const paintAll = () => { paintDial(); paintSlots(); paintTasks(); paintStats(); paintPlan(); };
 
 /* ---------------- timer engine ---------------- */
 function bank(seconds){
@@ -487,6 +739,7 @@ function bank(seconds){
   if(t) t.seconds += whole;
 }
 
+let lastSave = 0;
 function loop(){
   if(!running) return;
   const now = Date.now();
@@ -497,7 +750,11 @@ function loop(){
   remaining -= delta;
 
   if(remaining <= 0){ finishPhase(); }
-  else { paintDial(); paintStats(); }
+  else {
+    // Flush to storage now and then, so closing the tab mid session does not lose the time.
+    if(now - lastSave > 10000){ lastSave = now; save(); }
+    paintDial(); paintStats();
+  }
 }
 setInterval(loop, 250);
 
@@ -510,17 +767,37 @@ function finishPhase(){
     S.inCycle += 1;
     const t = activeTask();
     if(t) t.poms += 1;
-    phase = (S.inCycle % S.settings.every === 0) ? "long" : "short";
-  } else {
-    phase = "work";
   }
-  remaining = phaseLen(phase);
-  running = !!S.settings.auto;
+
+  let planDone = false, nextName = "";
+  if(S.plan){
+    S.plan.i += 1;
+    const g = planSeg();
+    if(g){
+      syncToSeg();
+      const t = g.taskId ? S.tasks.find(x => x.id === g.taskId) : null;
+      if(t) nextName = t.name;
+    } else {
+      S.plan = null;
+      planDone = true;
+      phase = "work";
+      remaining = phaseLen("work");
+    }
+  } else {
+    phase = wasWork ? ((S.inCycle % S.settings.every === 0) ? "long" : "short") : "work";
+    remaining = phaseLen(phase);
+  }
+
+  // a plan runs itself start to finish, otherwise the auto start setting decides
+  running = planDone ? false : (S.plan ? true : !!S.settings.auto);
   lastStamp = Date.now();
   carry = 0;
   save();
   chime(wasWork);
-  ping(wasWork ? "Pomodoro logged. Time for a break." : "Break over. Back to it.");
+  ping(planDone ? "Plan finished. Every block done."
+     : wasWork ? "Pomodoro logged. Time for a break."
+     : nextName ? "Break over. Next up: " + nextName + "."
+     : "Break over. Back to it.");
   paintAll();
 }
 
@@ -556,7 +833,7 @@ $("go").onclick = () => {
   paintDial();
 };
 $("reset").onclick = () => {
-  running = false; remaining = phaseLen(phase); carry = 0; paintDial();
+  running = false; remaining = curLen(); carry = 0; paintDial();
 };
 $("skip").onclick = () => { remaining = 0; finishPhase(); };
 
@@ -566,7 +843,7 @@ function addTask(){
   const box = $("newTask");
   const name = box.value.trim();
   if(!name) return;
-  const t = {id:Date.now().toString(36), name, seconds:0, poms:0, done:false};
+  const t = {id:Date.now().toString(36), name, seconds:0, poms:0, done:false, diff:2};
   S.tasks.push(t);
   if(!S.activeId) S.activeId = t.id;
   box.value = "";
@@ -580,7 +857,7 @@ const bindNum = (id, key) => {
   el.onchange = () => {
     const v = clean(el.value) || blank.settings[key];
     S.settings[key] = v; el.value = v;
-    if(!running) remaining = phaseLen(phase);
+    if(!running) remaining = curLen();
     save(); paintDial();
   };
 };
@@ -602,8 +879,58 @@ $("wipe").onclick = () => {
   save(); paintAll();
 };
 
+/* ---------------- planner controls ---------------- */
+$("makePlan").onclick = () => {
+  const out = buildPlan(clean($("budget").value) || 0);
+  if(out.error){
+    $("planSum").className = "plan-sum warn";
+    $("planSum").textContent = out.error;
+    return;
+  }
+  S.plan = out.plan;
+  running = false;
+  syncToSeg();
+  save(); paintAll();
+};
+$("dropPlan").onclick = () => {
+  S.plan = null;
+  running = false;
+  phase = "work"; remaining = phaseLen("work"); carry = 0;
+  save(); paintAll();
+};
+$("chips").onclick = e => {
+  const b = e.target.closest(".chip");
+  if(!b) return;
+  $("budget").value = b.dataset.min;
+  $("makePlan").click();
+};
+
+/* ---------------- install as an app ---------------- */
+let installer = null;
+addEventListener("beforeinstallprompt", e => {
+  e.preventDefault();
+  installer = e;
+  $("install").hidden = false;
+});
+$("install").onclick = async () => {
+  if(!installer) return;
+  $("install").hidden = true;
+  installer.prompt();
+  try{ await installer.userChoice; }catch(err){}
+  installer = null;
+};
+addEventListener("appinstalled", () => { installer = null; $("install").hidden = true; });
+
 /* ---------------- boot ---------------- */
+if(S.plan) syncToSeg();
 paintAll();
+
+// opened from the home screen shortcut
+if(new URLSearchParams(location.search).get("go") === "1" && !running){
+  running = true; lastStamp = Date.now(); paintDial();
+}
+addEventListener("pagehide", save);
+addEventListener("visibilitychange", () => { if(document.visibilityState === "hidden") save(); });
 if("serviceWorker" in navigator){
   window.addEventListener("load", () => navigator.serviceWorker.register("sw.js").catch(()=>{}));
 }

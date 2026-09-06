@@ -1,4 +1,4 @@
-const CACHE = "orbit-v1";
+const CACHE = "orbit-v3";
 const SHELL = [
   "./",
   "./index.html",
@@ -22,6 +22,19 @@ self.addEventListener("activate", e => {
 
 self.addEventListener("fetch", e => {
   if (e.request.method !== "GET") return;
+
+  // Pages go to the network first so a redeploy shows up, cache is the offline fallback.
+  if (e.request.mode === "navigate") {
+    e.respondWith(
+      fetch(e.request).then(res => {
+        const copy = res.clone();
+        caches.open(CACHE).then(c => c.put("./index.html", copy)).catch(() => {});
+        return res;
+      }).catch(() => caches.match("./index.html").then(hit => hit || caches.match("./")))
+    );
+    return;
+  }
+
   e.respondWith(
     caches.match(e.request).then(hit => {
       if (hit) return hit;
