@@ -1,0 +1,68 @@
+{
+  "name": "orbodoro",
+  "productName": "Orbodoro",
+  "version": "1.0.0",
+  "description": "Orbodoro, a pomodoro timer that tracks study time, rest time and named sessions. Carlosity Teaches.",
+  "author": "Carlos Alvarez",
+  "private": true,
+  "main": "main.js",
+  "scripts": {
+    "prepare-assets": "node prepare.js",
+    "start": "node prepare.js && electron .",
+    "dist": "node make-icon.js && node prepare.js && node build.js",
+    "make-icon": "node make-icon.js"
+  },
+  "build": {
+    "appId": "com.carlosityteaches.orbodoro",
+    "productName": "Orbodoro",
+    "copyright": "Carlosity Teaches",
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "files": [
+      "main.js",
+      "package.json",
+      "app/**/*",
+      "build/icon.png"
+    ],
+    "win": {
+      "icon": "build/icon.ico",
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Orbodoro",
+      "artifactName": "Orbodoro-Setup-${version}.${ext}",
+      "installerIcon": "build/icon.ico",
+      "uninstallerIcon": "build/icon.ico",
+      "packElevateHelper": false
+    },
+    "portable": {
+      "artifactName": "Orbodoro-${version}-portable.${ext}"
+    }
+  },
+  "devDependencies": {
+    "electron": "^44.3.0",
+    "electron-builder": "^26.15.3",
+    "png-to-ico": "^3.0.2",
+    "sharp": "^0.35.4"
+  }
+}

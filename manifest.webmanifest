@@ -1,7 +1,7 @@
 {
-  "name": "Orbit · Carlosity Teaches",
-  "short_name": "Orbit",
-  "description": "A pomodoro timer that logs focus time per task.",
+  "name": "Orbodoro · Carlosity Teaches",
+  "short_name": "Orbodoro",
+  "description": "A pomodoro timer that tracks study time, rest time and named sessions you can come back to.",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
@@ -39,8 +39,8 @@
   ],
   "shortcuts": [
     {
-      "name": "Start a focus block",
-      "short_name": "Focus",
+      "name": "Start a study block",
+      "short_name": "Study",
       "url": "./?go=1",
       "icons": [
         {
