@@ -15,6 +15,7 @@ what you are working on so you can come back to it later and keep adding to its 
 - Every specific pomodoro shows its own total, study and rest, for today and for all time
 - 25 / 5 / 15 cycle with adjustable lengths and a configurable long break interval
 - Four separate sounds you can set yourself: start, stop, continue and end
+- Start on a focus block or warm up with a break, your choice
 - Six themes
 - Session planner that sizes blocks by task difficulty and fits them to the time you have
 - Everything saves locally, so closing the app or the tab does not wipe your totals
@@ -71,6 +72,11 @@ any remainder too small for its own block is folded into the last one.
 Press Start once and it runs the whole thing, switching the active session at each
 block. The lengths it picked are written into Settings, so you can still override any
 of them by hand afterwards.
+
+Turning on "Start with a break" in Settings opens the session with a break instead of
+dropping you straight into work. It applies to the plain timer and to planned sessions
+alike, and the opening break comes out of the same budget, shrinking rather than
+crowding out a block when time is tight.
 
 ## Files
 

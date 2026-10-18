@@ -378,6 +378,7 @@
       <div class="swatches" id="swatches" style="margin-top:10px"></div>
 
       <div class="toggles" style="margin-top:22px">
+        <label><input type="checkbox" id="sStartRest"> Start with a break</label>
         <label><input type="checkbox" id="sAuto"> Auto start next block</label>
         <label><input type="checkbox" id="sNotify"> Notifications</label>
       </div>
@@ -409,7 +410,7 @@ const store = {
 const blank = {
   settings:{
     work:25, short:5, long:15, every:4,
-    auto:false, notify:false,
+    auto:false, notify:false, startRest:false,
     theme:"midnight", energy:"mid",
     sounds:{ start:"marimba", stop:"click", end:"chime", cont:"blip" }
   },
@@ -615,6 +616,15 @@ function buildPlan(budget){
   const segs = [];
   let left = Math.min(budget, MAX_BUDGET), blocks = 0;
 
+  // open on a break if asked, but only when a whole block still fits after it
+  if(S.settings.startRest){
+    const opener = Math.min(S.settings.short, left - MIN_BLOCK);
+    if(opener >= 2){
+      segs.push({kind:"short", itemId:null, secs:opener*60});
+      left -= opener;
+    }
+  }
+
   while(left >= MIN_BLOCK && segs.length < MAX_SEGS){
     let pick = pool[0];
     for(const i of pool){
@@ -691,9 +701,10 @@ function applySetup(cfg){
 function describeSetup(cfg){
   const e = ENERGY[S.settings.energy] || ENERGY.mid;
   const load = cfg.avg <= 1.5 ? "light" : cfg.avg >= 2.5 ? "heavy" : "medium";
-  const why = cfg.hasItems
+  let why = cfg.hasItems
     ? "Your list looks " + load + " and you said " + e.name.toLowerCase() + "."
     : "Nothing on the list yet, so it assumed medium work and you said " + e.name.toLowerCase() + ".";
+  if(S.settings.startRest) why += " Opening with a break.";
   const blocks = cfg.mixed
     ? "around " + cfg.focus + " minute blocks, longer for the heavy ones"
     : cfg.focus + " minute blocks";
@@ -734,10 +745,12 @@ function dropFromPlan(id){
 }
 
 /* ---------------- runtime ---------------- */
-let phase = "work";                 // work | short | long
+// A session opens on a focus block unless you would rather warm up with a break.
+const startPhase = () => S.settings.startRest ? "short" : "work";
+let phase = startPhase();           // work | short | long
 const phaseLen = p => (p === "work" ? S.settings.work : p === "short" ? S.settings.short : S.settings.long) * 60;
 const curLen = () => { const g = planSeg(); return g ? g.secs : phaseLen(phase); };
-let remaining = phaseLen("work");
+let remaining = phaseLen(phase);
 let running = false;
 let lastStamp = 0;
 let carry = 0;
@@ -804,7 +817,7 @@ function finishPhase(){
       if(it) nextName = it.name;
     } else {
       S.plan = null; planDone = true;
-      phase = "work"; remaining = phaseLen("work");
+      phase = startPhase(); remaining = phaseLen(phase);
     }
   } else {
     phase = wasWork ? ((S.inCycle % S.settings.every === 0) ? "long" : "short") : "work";
@@ -1128,7 +1141,7 @@ $("energy").onclick = e => {
 $("dropPlan").onclick = () => {
   $("madeBox").hidden = true;
   S.plan = null; running = false;
-  phase = "work"; remaining = phaseLen("work"); carry = 0;
+  phase = startPhase(); remaining = phaseLen(phase); carry = 0;
   save(); paintAll();
 };
 $("chips").onclick = e => {
@@ -1151,6 +1164,17 @@ const bindNum = (id, key) => {
 };
 bindNum("sWork","work"); bindNum("sShort","short"); bindNum("sLong","long"); bindNum("sEvery","every");
 
+$("sStartRest").checked = S.settings.startRest;
+$("sStartRest").onchange = e => {
+  S.settings.startRest = e.target.checked;
+  // show the change straight away when nothing is under way
+  if(!running && !S.plan){
+    phase = startPhase();
+    remaining = phaseLen(phase);
+    carry = 0;
+  }
+  save(); paintAll();
+};
 $("sAuto").checked = S.settings.auto;
 $("sAuto").onchange = e => { S.settings.auto = e.target.checked; save(); };
 $("sNotify").checked = S.settings.notify;
@@ -1163,7 +1187,7 @@ $("wipe").onclick = () => {
   const theme = S.settings.theme, sounds = S.settings.sounds;
   S = JSON.parse(JSON.stringify(blank));
   S.settings.theme = theme; S.settings.sounds = sounds;
-  phase = "work"; running = false; remaining = phaseLen("work"); carry = 0;
+  phase = startPhase(); running = false; remaining = phaseLen(phase); carry = 0;
   save(); paintAll();
 };
 
