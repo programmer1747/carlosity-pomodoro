@@ -23,7 +23,7 @@ what you are working on so you can come back to it later and keep adding to its 
 
 ## Sounds
 
-Four moments each get their own sound, chosen from ten built in tones or turned off:
+Four moments each get their own sound, chosen from nineteen built in ones or turned off:
 
 | Event    | Fires when                        |
 | -------- | --------------------------------- |
@@ -32,8 +32,14 @@ Four moments each get their own sound, chosen from ten built in tones or turned 
 | Stop     | you pause                         |
 | End      | a block runs out                  |
 
-The tones are generated in the browser, so there are no sound files to load and they
-work offline.
+The list runs from clicky and physical, Click, Clock tick, Keyboard, Click clack,
+Typing, Wood block, Knock and Thud, through natural, Bird, Cricket, Water drop and
+Page turn, to musical, Blip, Pulse, Marimba, Chime, Descend, Bell and Alarm.
+
+All of them are generated in the browser rather than loaded, so there are no audio
+files to download and they work with no connection. The physical ones are built from
+shaped bursts of filtered noise and the musical ones from pitched tones, which is how
+a keyboard click or a bird chirp comes out of the same few lines as a chime.
 
 ## Make my pomodoro
 
@@ -52,7 +58,10 @@ how you feel scales it:
 | Sharp   | 1.25x      | 0.85x       | 5 blocks         |
 
 Breaks come out of the block length, a fifth of it for a short break and three fifths
-for a long one, so they stay in proportion to the work. Blocks are clamped to between
+for a long one, so they stay in proportion to the work. If you would rather say how
+long a break should be, set it under Break length, by chip or by typing a number, and
+that length is taken literally: every break in the session is exactly that, the long
+break becomes three times it, and no per task scaling is applied. Auto hands it back. Blocks are clamped to between
 10 and 60 minutes, and never run longer than the time you actually have.
 
 Medium work while feeling okay lands on 25 / 5 / 15 every 4, the classic setting. Heavy

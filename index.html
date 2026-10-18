@@ -176,6 +176,7 @@
   .row{display:flex;flex-wrap:wrap;gap:12px}
   .fld{display:flex;flex-direction:column;gap:6px}
   .fld input[type=number]{width:76px}
+  #breakLen{width:72px}
   .fld select{width:132px}
   .snd{display:flex;gap:6px;align-items:flex-end}
   .snd button{padding:9px 10px;font-size:11px;white-space:nowrap}
@@ -336,6 +337,20 @@
         </div>
       </div>
 
+      <div class="fld" style="margin-top:16px">
+        <span class="cap">Break length</span>
+        <div class="row" style="gap:8px;align-items:center">
+          <input type="number" id="breakLen" min="1" max="60" value="5" aria-label="Break length in minutes">
+          <div class="chips" id="breakPick">
+            <button class="chip" data-brk="auto">Auto</button>
+            <button class="chip" data-brk="3">3m</button>
+            <button class="chip" data-brk="5">5m</button>
+            <button class="chip" data-brk="10">10m</button>
+            <button class="chip" data-brk="15">15m</button>
+          </div>
+        </div>
+      </div>
+
       <div class="row" style="margin-top:16px">
         <button class="plan-go" id="makePlan">Make my pomodoro</button>
         <button class="flat" id="dropPlan" hidden>Clear</button>
@@ -411,7 +426,7 @@ const blank = {
   settings:{
     work:25, short:5, long:15, every:4,
     auto:false, notify:false, startRest:false,
-    theme:"midnight", energy:"mid",
+    theme:"midnight", energy:"mid", breakPick:null,
     sounds:{ start:"marimba", stop:"click", end:"chime", cont:"blip" }
   },
   studySec:0, restSec:0,
@@ -521,20 +536,7 @@ function applyTheme(id){
 })();
 
 /* ---------------- sounds ---------------- */
-const SOUNDS = {
-  off:     {name:"Off"},
-  click:   {name:"Click",   wave:"triangle", gain:0.16, notes:[[1400,0.035]]},
-  blip:    {name:"Blip",    wave:"sine",     gain:0.2,  notes:[[880,0.09]]},
-  pulse:   {name:"Pulse",   wave:"sine",     gain:0.2,  notes:[[523.25,0.1],[0,0.05],[523.25,0.16]]},
-  chime:   {name:"Chime",   wave:"sine",     gain:0.22, notes:[[523.25,0.13],[659.25,0.13],[783.99,0.34]]},
-  descend: {name:"Descend", wave:"sine",     gain:0.22, notes:[[783.99,0.13],[659.25,0.13],[523.25,0.34]]},
-  marimba: {name:"Marimba", wave:"triangle", gain:0.22, notes:[[659.25,0.12],[987.77,0.32]]},
-  bell:    {name:"Bell",    wave:"sine",     gain:0.2,  notes:[[1046.5,0.9]]},
-  alarm:   {name:"Alarm",   wave:"square",   gain:0.1,  notes:[[880,0.09],[0,0.07],[880,0.09],[0,0.07],[880,0.09],[0,0.07],[880,0.22]]},
-  thud:    {name:"Thud",    wave:"sine",     gain:0.28, notes:[[180,0.18]]}
-};
-
-let ac = null;
+let ac = null, noiseBuf = null;
 function audio(){
   try{
     ac = ac || new (window.AudioContext || window.webkitAudioContext)();
@@ -542,26 +544,129 @@ function audio(){
     return ac;
   }catch(e){ return null; }
 }
+
+/* ---------------- sound building blocks ----------------
+   Everything is generated here rather than loaded, so there are no audio files to
+   download and the sounds still work with no connection. A pitched tone covers the
+   musical ones, and a burst of filtered noise covers the physical ones, clicks,
+   chirps, knocks and the like. */
+
+function noiseSource(c){
+  if(!noiseBuf){
+    const len = Math.floor(c.sampleRate * 0.5);
+    noiseBuf = c.createBuffer(1, len, c.sampleRate);
+    const d = noiseBuf.getChannelData(0);
+    for(let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
+  }
+  const src = c.createBufferSource();
+  src.buffer = noiseBuf;
+  src.loop = true;
+  return src;
+}
+
+// a pitched note, optionally sliding from one frequency to another
+function tone(c, t, o){
+  const osc = c.createOscillator(), g = c.createGain();
+  const dur = o.dur || 0.1, peak = o.gain || 0.2, atk = o.attack || 0.008;
+  osc.type = o.type || "sine";
+  osc.frequency.setValueAtTime(o.f0, t);
+  if(o.f1 && o.f1 !== o.f0) osc.frequency.exponentialRampToValueAtTime(Math.max(20, o.f1), t + dur);
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.exponentialRampToValueAtTime(peak, t + atk);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  osc.connect(g); g.connect(c.destination);
+  osc.start(t); osc.stop(t + dur + 0.03);
+}
+
+// a short shaped puff of noise, the basis of every clicky or woody sound
+function burst(c, t, o){
+  const src = noiseSource(c), f = c.createBiquadFilter(), g = c.createGain();
+  const atk = o.attack || 0.002, dec = o.decay || 0.05, peak = o.gain || 0.25;
+  f.type = o.type || "bandpass";
+  f.frequency.value = o.freq || 2000;
+  f.Q.value = o.q || 1;
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.exponentialRampToValueAtTime(peak, t + atk);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + atk + dec);
+  src.connect(f); f.connect(g); g.connect(c.destination);
+  src.start(t); src.stop(t + atk + dec + 0.03);
+}
+
+// one keyboard key going down, a sharp tick over a small hollow thunk
+function keyDown(c, t, bright, level){
+  burst(c, t, {freq:bright, q:1.3, gain:0.26 * level, decay:0.022});
+  tone(c, t, {f0:300, f1:150, dur:0.05, type:"triangle", gain:0.13 * level, attack:0.002});
+}
+
+const SOUNDS = {
+  off:     {name:"Off"},
+
+  /* clicky and physical */
+  click:   {name:"Click",       play:(c,t) => burst(c, t, {freq:4200, q:1.6, gain:0.55, decay:0.016})},
+  tick:    {name:"Clock tick",  play:(c,t) => burst(c, t, {freq:5200, q:2.4, gain:0.45, decay:0.012})},
+  keys:    {name:"Keyboard",    play:(c,t) => keyDown(c, t, 2800, 1)},
+  clack:   {name:"Click clack", play:(c,t) => { keyDown(c, t, 3100, 1); keyDown(c, t + 0.085, 2000, 0.7); }},
+  typing:  {name:"Typing",      play:(c,t) => [0, 0.07, 0.15, 0.2, 0.29].forEach((d,i) =>
+                                                 keyDown(c, t + d, 2400 + i * 260, 0.8))},
+  wood:    {name:"Wood block",  play:(c,t) => {
+              burst(c, t, {freq:1250, q:7, gain:0.75, decay:0.05});
+              tone(c, t, {f0:950, f1:720, dur:0.07, type:"triangle", gain:0.14, attack:0.002});
+            }},
+  knock:   {name:"Knock",       play:(c,t) => {
+              burst(c, t, {freq:420, q:3, gain:1.9, decay:0.06});
+              burst(c, t + 0.14, {freq:380, q:3, gain:1.5, decay:0.06});
+            }},
+  thud:    {name:"Thud",        play:(c,t) => tone(c, t, {f0:180, f1:70, dur:0.18, gain:0.28})},
+
+  /* natural */
+  bird:    {name:"Bird",        play:(c,t) => {
+              tone(c, t,        {f0:2300, f1:3500, dur:0.06, gain:0.19, attack:0.004});
+              tone(c, t + 0.06, {f0:3500, f1:2400, dur:0.08, gain:0.18, attack:0.004});
+              tone(c, t + 0.24, {f0:2600, f1:3700, dur:0.05, gain:0.18, attack:0.004});
+              tone(c, t + 0.29, {f0:3700, f1:2500, dur:0.09, gain:0.15, attack:0.004});
+            }},
+  cricket: {name:"Cricket",     play:(c,t) => [0, 0.09, 0.18].forEach(d => {
+              burst(c, t + d, {freq:4600, q:14, gain:1.5, decay:0.035});
+            })},
+  drop:    {name:"Water drop",  play:(c,t) => {
+              tone(c, t, {f0:1600, f1:430, dur:0.11, gain:0.22, attack:0.003});
+              burst(c, t, {freq:4000, q:0.8, gain:0.05, decay:0.02});
+            }},
+  paper:   {name:"Page turn",   play:(c,t) => {
+              burst(c, t, {freq:3200, q:0.5, gain:0.26, attack:0.035, decay:0.13});
+              burst(c, t + 0.1, {freq:1800, q:0.5, gain:0.15, attack:0.02, decay:0.1});
+            }},
+
+  /* musical */
+  blip:    {name:"Blip",        play:(c,t) => tone(c, t, {f0:880, dur:0.09, gain:0.2})},
+  pulse:   {name:"Pulse",       play:(c,t) => {
+              tone(c, t, {f0:523.25, dur:0.1, gain:0.2});
+              tone(c, t + 0.15, {f0:523.25, dur:0.16, gain:0.2});
+            }},
+  marimba: {name:"Marimba",     play:(c,t) => {
+              tone(c, t, {f0:659.25, dur:0.12, type:"triangle", gain:0.22});
+              tone(c, t + 0.12, {f0:987.77, dur:0.32, type:"triangle", gain:0.22});
+            }},
+  chime:   {name:"Chime",       play:(c,t) => [523.25, 659.25, 783.99].forEach((f,i) =>
+              tone(c, t + i * 0.13, {f0:f, dur: i === 2 ? 0.34 : 0.13, gain:0.22}))},
+  descend: {name:"Descend",     play:(c,t) => [783.99, 659.25, 523.25].forEach((f,i) =>
+              tone(c, t + i * 0.13, {f0:f, dur: i === 2 ? 0.34 : 0.13, gain:0.22}))},
+  bell:    {name:"Bell",        play:(c,t) => {
+              tone(c, t, {f0:1046.5, dur:0.9, gain:0.18});
+              tone(c, t, {f0:2637, dur:0.45, gain:0.045});
+            }},
+  alarm:   {name:"Alarm",       play:(c,t) => {
+              for(let i = 0; i < 4; i++)
+                tone(c, t + i * 0.16, {f0:880, dur: i === 3 ? 0.22 : 0.09, type:"square", gain:0.16});
+            }}
+};
+
 function playName(id){
   const def = SOUNDS[id];
-  if(!def || !def.notes) return;
+  if(!def || !def.play) return;
   const c = audio();
   if(!c) return;
-  let t = c.currentTime + 0.01;
-  def.notes.forEach(n => {
-    const f = n[0], d = n[1];
-    if(f > 0){
-      const o = c.createOscillator(), g = c.createGain();
-      o.type = def.wave || "sine";
-      o.frequency.value = f;
-      g.gain.setValueAtTime(0.0001, t);
-      g.gain.exponentialRampToValueAtTime(def.gain || 0.2, t + 0.014);
-      g.gain.exponentialRampToValueAtTime(0.0001, t + d);
-      o.connect(g); g.connect(c.destination);
-      o.start(t); o.stop(t + d + 0.03);
-    }
-    t += d;
-  });
+  try{ def.play(c, c.currentTime + 0.01); }catch(e){}
 }
 const cue = ev => playName(S.settings.sounds[ev] || "off");
 
@@ -639,7 +744,10 @@ function buildPlan(budget){
 
     if(left < MIN_BLOCK + 2) break;
     const isLong = blocks % S.settings.every === 0;
-    const bl = Math.min(isLong ? S.settings.long : breakMin(pick.diff, normBrk), left - MIN_BLOCK);
+    // when you pick the break yourself it stays that length for every block
+    const want = isLong ? S.settings.long
+                        : (S.settings.breakPick ? S.settings.short : breakMin(pick.diff, normBrk));
+    const bl = Math.min(want, left - MIN_BLOCK);
     if(bl < 2) continue;
     segs.push({kind: isLong ? "long" : "short", itemId:null, secs:bl*60});
     left -= bl;
@@ -679,12 +787,21 @@ function workOutSetup(budget){
   // never hand out a block longer than the time available
   if(budget > 0 && budget < focus) focus = Math.max(10, Math.floor(budget / 5) * 5);
 
-  const short = Math.max(3,  Math.min(15, Math.round(focus * 0.2 * e.brk)));
-  const long  = Math.max(10, Math.min(30, Math.round(focus * 0.6 * e.brk)));
+  // A break you picked yourself is taken literally. Left on auto it comes out of the
+  // block length, a fifth of it for a short break and three fifths for a long one.
+  const pinned = S.settings.breakPick;
+  let short, long;
+  if(pinned){
+    short = Math.max(1, Math.min(60, pinned));
+    long  = Math.max(short, Math.min(60, Math.round(short * 3)));
+  } else {
+    short = Math.max(3,  Math.min(15, Math.round(focus * 0.2 * e.brk)));
+    long  = Math.max(10, Math.min(30, Math.round(focus * 0.6 * e.brk)));
+  }
 
   // a list of all one difficulty gets one block length, a mixed list gets a spread
   const mixed = new Set(open.map(i => i.diff)).size > 1;
-  return {focus, short, long, every:e.every, avg, mixed, hasItems:open.length > 0};
+  return {focus, short, long, every:e.every, avg, mixed, pinned:!!pinned, hasItems:open.length > 0};
 }
 
 function applySetup(cfg){
@@ -696,6 +813,7 @@ function applySetup(cfg){
   $("sShort").value = cfg.short;
   $("sLong").value = cfg.long;
   $("sEvery").value = cfg.every;
+  $("breakLen").value = cfg.short;
 }
 
 function describeSetup(cfg){
@@ -708,8 +826,12 @@ function describeSetup(cfg){
   const blocks = cfg.mixed
     ? "around " + cfg.focus + " minute blocks, longer for the heavy ones"
     : cfg.focus + " minute blocks";
+  const breaks = (cfg.mixed && !cfg.pinned)
+    ? "breaks around " + cfg.short + " minutes"
+    : cfg.short + " minute breaks";
+  if(cfg.pinned) why += " Break length is yours.";
   return {
-    head: blocks + ", " + cfg.short + " minute breaks, "
+    head: blocks + ", " + breaks + ", "
         + cfg.long + " minute long break every " + cfg.every,
     why
   };
@@ -1126,6 +1248,29 @@ $("makePlan").onclick = () => {
   save(); paintAll();
 };
 
+function paintBreakPick(){
+  const pick = S.settings.breakPick;
+  document.querySelectorAll("#breakPick .chip").forEach(b => {
+    const v = b.dataset.brk;
+    b.classList.toggle("on", pick == null ? v === "auto" : String(pick) === v);
+  });
+}
+$("breakPick").onclick = e => {
+  const b = e.target.closest(".chip");
+  if(!b) return;
+  S.settings.breakPick = b.dataset.brk === "auto" ? null : Number(b.dataset.brk);
+  paintBreakPick();
+  save();
+  $("makePlan").click();
+};
+$("breakLen").onchange = () => {
+  const v = clean($("breakLen").value);
+  S.settings.breakPick = v > 0 ? Math.min(60, v) : null;
+  paintBreakPick();
+  save();
+  $("makePlan").click();
+};
+
 function paintEnergy(){
   document.querySelectorAll("#energy .chip").forEach(b =>
     b.classList.toggle("on", b.dataset.energy === S.settings.energy));
@@ -1208,6 +1353,8 @@ addEventListener("appinstalled", () => { installer = null; $("install").hidden =
 /* ---------------- boot ---------------- */
 applyTheme(S.settings.theme);
 paintEnergy();
+paintBreakPick();
+$("breakLen").value = S.settings.short;
 if(S.plan) syncToSeg();
 paintAll();
 
