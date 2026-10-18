@@ -135,10 +135,14 @@
   .go:hover{background:var(--phase,var(--study));filter:brightness(1.1)}
   .flat{padding:12px 16px;font-size:12.5px;color:var(--dim)}
   .flat:hover{color:var(--text)}
-  .add{padding:12px 14px;font-variant-numeric:tabular-nums;color:var(--phase,var(--study))}
-  .add:hover{color:var(--ink);background:var(--phase,var(--study));border-color:var(--phase,var(--study))}
-  .add:disabled{opacity:.3;cursor:not-allowed}
-  .add:disabled:hover{color:var(--phase,var(--study));background:transparent;border-color:var(--line)}
+  .nudge{display:flex;gap:6px;justify-content:center;flex-wrap:wrap;margin-top:9px}
+  .nudge button{
+    padding:9px 14px;font-size:12.5px;font-variant-numeric:tabular-nums;
+    color:var(--phase,var(--study))
+  }
+  .nudge button:hover{color:var(--ink);background:var(--phase,var(--study));border-color:var(--phase,var(--study))}
+  .nudge button:disabled{opacity:.28;cursor:not-allowed}
+  .nudge button:disabled:hover{color:var(--phase,var(--study));background:transparent;border-color:var(--line)}
 
   /* ---------------- blocks ---------------- */
   .block{margin-top:20px;border:1px solid var(--line);background:var(--card)}
@@ -297,8 +301,12 @@
       <button class="go" id="go">Start</button>
       <button class="flat" id="reset">Reset</button>
       <button class="flat" id="skip">Skip</button>
-      <button class="flat add" id="add1" title="Add a minute to this block">+1</button>
-      <button class="flat add" id="add5" title="Add five minutes to this block">+5</button>
+    </div>
+    <div class="nudge">
+      <button id="sub5" title="Take five minutes off this block">-5</button>
+      <button id="sub1" title="Take a minute off this block">-1</button>
+      <button id="add1" title="Add a minute to this block">+1</button>
+      <button id="add5" title="Add five minutes to this block">+5</button>
     </div>
   </section>
 
@@ -881,8 +889,10 @@ const phaseLen = p => (p === "work" ? S.settings.work : p === "short" ? S.settin
 // Time added to the block has to lengthen the block as well as the countdown, or the
 // ring would jump backwards. For a planned block the segment itself grows, so the
 // schedule below the timer stays honest about what it now costs.
-let addedSec = 0;
-const MAX_PHASE = 240 * 60;
+let addedSec = 0;                   // negative once time has been taken off
+const MAX_PHASE = 240 * 60;         // a block tops out at four hours
+const MIN_PHASE = 60;               // and never shrinks below a minute
+const MIN_LEFT = 30;                // leaving at least this long on the clock
 const curLen = () => { const g = planSeg(); return g ? g.secs : phaseLen(phase) + addedSec; };
 let remaining = phaseLen(phase);
 let running = false;
@@ -1038,12 +1048,16 @@ function paintTimer(){
     tag += phase === "work" ? " · block " + step + " of " + total
                             : " · " + Math.max(0, total - step) + " to go";
   }
-  if(addedSec > 0) tag += " · +" + Math.round(addedSec / 60) + "m";
+  if(addedSec !== 0){
+    const m = Math.round(addedSec / 60);
+    tag += " · " + (m > 0 ? "+" : "") + m + "m";
+  }
   $("phase").textContent = tag;
 
-  const noRoom = curLen() >= MAX_PHASE;
-  $("add1").disabled = noRoom || curLen() + 60 > MAX_PHASE;
-  $("add5").disabled = noRoom || curLen() + 300 > MAX_PHASE;
+  $("add1").disabled = !canShift(1);
+  $("add5").disabled = !canShift(5);
+  $("sub1").disabled = !canShift(-1);
+  $("sub5").disabled = !canShift(-5);
 
   const it = activeItem();
   $("doing").textContent = phase === "work"
@@ -1215,17 +1229,29 @@ $("reset").onclick = () => {
 };
 $("skip").onclick = () => { remaining = 0; finishPhase(); };
 
-function extend(mins){
+// Adding or taking off time moves the block length as well as the countdown. Shifting
+// only the countdown would put the ring out of step with the block it is measuring.
+function canShift(mins){
   const secs = mins * 60;
-  if(curLen() + secs > MAX_PHASE) return;
+  return secs > 0
+    ? curLen() + secs <= MAX_PHASE
+    : remaining + secs >= MIN_LEFT && curLen() + secs >= MIN_PHASE;
+}
+
+function shift(mins){
+  if(!canShift(mins)) return;
+  const secs = mins * 60;
   remaining += secs;
   addedSec += secs;
   const g = planSeg();
-  if(g) g.secs += secs;
+  if(g) g.secs += secs;            // a planned block keeps the schedule in step
   save(); paintAll();
 }
-$("add1").onclick = () => extend(1);
-$("add5").onclick = () => extend(5);
+
+$("sub5").onclick = () => shift(-5);
+$("sub1").onclick = () => shift(-1);
+$("add1").onclick = () => shift(1);
+$("add5").onclick = () => shift(5);
 
 $("addItem").onclick = addItem;
 $("newItem").onkeydown = e => { if(e.key === "Enter") addItem(); };

@@ -16,24 +16,33 @@ what you are working on so you can come back to it later and keep adding to its 
 - 25 / 5 / 15 cycle with adjustable lengths and a configurable long break interval
 - Four separate sounds you can set yourself: start, stop, continue and end
 - Start on a focus block or warm up with a break, your choice
-- +1 and +5 buttons to stretch a block that is about to run out
+- Minus and plus buttons to stretch or trim a block while it is running
 - Six themes
 - Session planner that sizes blocks by task difficulty and fits them to the time you have
 - Everything saves locally, so closing the app or the tab does not wipe your totals
 - Runs in a browser, installs as an app, or runs as a downloaded Windows program
 
-## Stretching a block
+## Adjusting a block
 
-**+1** and **+5** next to Skip add a minute or five to whatever is running, for when a
-block is about to end and you are not done. The block itself grows, not just the
-countdown, so the ring stays honest: adding time nudges the arc back because there is
-proportionally more left to go, rather than overfilling it.
+A row under the main controls, **-5 -1 +1 +5**, changes the block that is running, for
+when it is about to end and you are not done, or when you want it over sooner.
 
-The phase label shows what you have added, "Focus · +6m", and the added time belongs
-to that block alone. Moving on or pressing Reset clears it. Stretching a planned block
-also grows that segment in the schedule below, so the block list and the projected
-finish time both account for it instead of quietly going stale. A block tops out at
-four hours.
+The block length moves with the countdown, not just the countdown on its own. Progress
+is measured against the block, so shifting only the clock would send the ring past full
+or out of step with what it is measuring. Moving both means the arc eases back when you
+add time and jumps forward when you take it away, which is what actually happened to
+how far through you are.
+
+The phase label carries the running total, "Focus · +6m" or "Focus · -5m", and it is
+reversible: adding back what you took off returns the block to normal and clears the
+label. The adjustment belongs to that block alone, so advancing or pressing Reset
+clears it.
+
+Adjusting a planned block also moves that segment in the schedule below, so the block
+list and the projected finish time stay true to what the timer is doing. A block tops
+out at four hours and will not shrink below a minute or leave less than thirty seconds
+on the clock, and each button disables itself when there is no room, including as the
+clock runs down past it.
 
 ## Sounds
 
