@@ -58,6 +58,10 @@ Medium work while feeling okay lands on 25 / 5 / 15 every 4, the classic setting
 work while sharp opens up to 50 minute blocks. Heavy work while fried pulls back to 30
 with a long break every 3.
 
+That length describes the average of your list. If the list is mixed, individual blocks
+spread around it, shorter for the light ones and longer for the heavy ones, rather than
+every task getting the same slot.
+
 **Then it lays out the session.** Blocks are shared across your specific pomodoros in
 proportion to difficulty, light 1, medium 2, heavy 3.2, and each one goes to whichever
 is furthest behind its share, so a heavy task ends up with roughly three times the

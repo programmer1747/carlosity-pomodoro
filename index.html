@@ -588,13 +588,28 @@ const DIFF = {
   3:{tag:"H", name:"Heavy",  weight:3.2, block:1.7, brk:1.6}
 };
 const MIN_BLOCK = 10, MAX_SEGS = 60, MAX_BUDGET = 720;
-const blockMin = d => Math.max(MIN_BLOCK, Math.min(75, Math.round(S.settings.work * DIFF[d].block)));
-const breakMin = d => Math.max(3, Math.min(30, Math.round(S.settings.short * DIFF[d].brk)));
+// The focus length already reflects the average difficulty of the list, so per task
+// sizing has to be relative to that average. Scaling by the raw factor again would
+// hand a heavy task 1.7x a length that was itself already stretched for being heavy.
+function lerpFactor(d, key){
+  if(d <= 1) return DIFF[1][key];
+  if(d >= 3) return DIFF[3][key];
+  return d <= 2
+    ? DIFF[1][key] + (d - 1) * (DIFF[2][key] - DIFF[1][key])
+    : DIFF[2][key] + (d - 2) * (DIFF[3][key] - DIFF[2][key]);
+}
+const avgDiff = pool => pool.length ? pool.reduce((a,i) => a + i.diff, 0) / pool.length : 2;
+const blockMin = (d, norm) => Math.max(MIN_BLOCK, Math.min(75, Math.round(S.settings.work * DIFF[d].block / norm)));
+const breakMin = (d, norm) => Math.max(3, Math.min(30, Math.round(S.settings.short * DIFF[d].brk / norm)));
 
 function buildPlan(budget){
   const pool = S.items.filter(i => !i.done);
   if(!pool.length) return {error:"Add a specific pomodoro first, then there is something to split the time across."};
   if(budget < MIN_BLOCK) return {error:"Give it at least " + MIN_BLOCK + " minutes to work with."};
+
+  const avg = avgDiff(pool);
+  const normBlock = lerpFactor(avg, "block");
+  const normBrk = lerpFactor(avg, "brk");
 
   const load = new Map(pool.map(i => [i.id, 0]));
   const segs = [];
@@ -605,7 +620,7 @@ function buildPlan(budget){
     for(const i of pool){
       if(load.get(i.id)/DIFF[i.diff].weight < load.get(pick.id)/DIFF[pick.diff].weight) pick = i;
     }
-    const len = Math.min(blockMin(pick.diff), left);
+    const len = Math.min(blockMin(pick.diff, normBlock), left);
     if(len < MIN_BLOCK) break;
     segs.push({kind:"work", itemId:pick.id, secs:len*60});
     load.set(pick.id, load.get(pick.id) + len);
@@ -614,7 +629,7 @@ function buildPlan(budget){
 
     if(left < MIN_BLOCK + 2) break;
     const isLong = blocks % S.settings.every === 0;
-    const bl = Math.min(isLong ? S.settings.long : breakMin(pick.diff), left - MIN_BLOCK);
+    const bl = Math.min(isLong ? S.settings.long : breakMin(pick.diff, normBrk), left - MIN_BLOCK);
     if(bl < 2) continue;
     segs.push({kind: isLong ? "long" : "short", itemId:null, secs:bl*60});
     left -= bl;
@@ -643,7 +658,7 @@ const ENERGY = {
 
 function workOutSetup(budget){
   const open = S.items.filter(i => !i.done);
-  const avg = open.length ? open.reduce((a,i) => a + i.diff, 0) / open.length : 2;
+  const avg = avgDiff(open);
 
   // light work sits near 20 minutes, medium near 25, heavy stretches to 40
   const base = avg <= 2 ? 20 + (avg - 1) * 5 : 25 + (avg - 2) * 15;
@@ -657,7 +672,9 @@ function workOutSetup(budget){
   const short = Math.max(3,  Math.min(15, Math.round(focus * 0.2 * e.brk)));
   const long  = Math.max(10, Math.min(30, Math.round(focus * 0.6 * e.brk)));
 
-  return {focus, short, long, every:e.every, avg, hasItems:open.length > 0};
+  // a list of all one difficulty gets one block length, a mixed list gets a spread
+  const mixed = new Set(open.map(i => i.diff)).size > 1;
+  return {focus, short, long, every:e.every, avg, mixed, hasItems:open.length > 0};
 }
 
 function applySetup(cfg){
@@ -677,8 +694,11 @@ function describeSetup(cfg){
   const why = cfg.hasItems
     ? "Your list looks " + load + " and you said " + e.name.toLowerCase() + "."
     : "Nothing on the list yet, so it assumed medium work and you said " + e.name.toLowerCase() + ".";
+  const blocks = cfg.mixed
+    ? "around " + cfg.focus + " minute blocks, longer for the heavy ones"
+    : cfg.focus + " minute blocks";
   return {
-    head: cfg.focus + " minute blocks, " + cfg.short + " minute breaks, "
+    head: blocks + ", " + cfg.short + " minute breaks, "
         + cfg.long + " minute long break every " + cfg.every,
     why
   };
