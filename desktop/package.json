@@ -1,8 +1,8 @@
 {
   "name": "orbodoro",
   "productName": "Orbodoro",
-  "version": "1.0.0",
-  "description": "Orbodoro, a pomodoro timer that tracks study time, rest time and named sessions. Carlosity Teaches.",
+  "version": "1.0.1",
+  "description": "Orbodoro, a pomodoro timer that tracks study time, rest time and named sessions. By Carlosity.",
   "author": "Carlos Alvarez",
   "private": true,
   "main": "main.js",
@@ -13,9 +13,9 @@
     "make-icon": "node make-icon.js"
   },
   "build": {
-    "appId": "com.carlosityteaches.orbodoro",
+    "appId": "com.carlosity.orbodoro",
     "productName": "Orbodoro",
-    "copyright": "Carlosity Teaches",
+    "copyright": "Carlosity",
     "directories": {
       "output": "dist",
       "buildResources": "build"

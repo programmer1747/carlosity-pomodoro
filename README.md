@@ -1,4 +1,4 @@
-# Orbodoro · Carlosity Teaches
+# Orbodoro · By Carlosity
 
 A pomodoro timer that measures study time and rest time separately, and lets you name
 what you are working on so you can come back to it later and keep adding to its total.

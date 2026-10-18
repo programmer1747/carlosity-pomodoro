@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Orbodoro · Carlosity Teaches</title>
+<title>Orbodoro · By Carlosity</title>
 <meta name="description" content="Orbodoro, a pomodoro timer that tracks study time, rest time and named sessions you can come back to.">
 <meta name="theme-color" content="#0E1730">
 <link rel="manifest" href="manifest.webmanifest">
@@ -104,12 +104,29 @@
   .timer{border:1px solid var(--line);border-top:0;background:var(--card);padding:22px 18px 20px;text-align:center}
   .phase{font-size:11px;font-weight:500;letter-spacing:.18em;text-transform:uppercase;color:var(--phase,var(--study))}
   .clock{
-    font-size:clamp(58px,16vw,86px); font-weight:300; line-height:1;
-    margin:10px 0 4px; font-variant-numeric:tabular-nums; letter-spacing:.01em;
+    font-size:clamp(46px,12.5vw,64px); font-weight:300; line-height:1;
+    font-variant-numeric:tabular-nums; letter-spacing:.01em;
   }
-  .doing{font-size:13px;color:var(--dim);min-height:19px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  .bar{height:5px;background:var(--bg);border:1px solid var(--line);margin:16px 0 18px}
-  .bar i{display:block;height:100%;background:var(--phase,var(--study));width:0%;transition:width .25s linear}
+  .doing{
+    font-size:12.5px;color:var(--dim);margin-top:10px;max-width:100%;
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap
+  }
+  .ring{position:relative;width:min(320px,74vw);aspect-ratio:1/1;margin:12px auto 2px}
+  .ring svg{width:100%;height:100%;display:block;overflow:visible}
+  .track{fill:none;stroke:var(--line);stroke-width:8}
+  .arc{
+    fill:none;stroke:var(--phase,var(--study));stroke-width:8;stroke-linecap:butt;
+    transform:rotate(-90deg);transform-origin:50% 50%;transition:stroke .4s ease
+  }
+  .sat{fill:var(--phase,var(--study))}
+  .sat-halo{fill:var(--phase,var(--study));opacity:.17}
+  .slot{fill:var(--line)}
+  .slot.on{fill:var(--rest)}
+  .readout{
+    position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;
+    justify-content:center;pointer-events:none;text-align:center;padding:0 14%
+  }
+  .slots-label{font-size:10.5px;font-weight:500;letter-spacing:.14em;text-transform:uppercase;color:var(--dim);margin:6px 0 16px}
   .controls{display:flex;gap:8px;justify-content:center;flex-wrap:wrap}
   .go{
     padding:12px 38px;font-size:14px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;
@@ -199,6 +216,10 @@
 
   @media (max-width:560px){
     .tiles{grid-template-columns:1fr;gap:1px}
+    /* the button label is long, so give it its own line instead of crushing the input */
+    .adder{flex-wrap:wrap}
+    .adder input{flex:1 1 100%}
+    .adder button{flex:1 1 100%;padding:11px 14px}
     .grid-stats{grid-template-columns:auto 1fr 1fr 1fr;gap:5px 8px;font-size:12px}
   }
   @media (prefers-reduced-motion:reduce){
@@ -214,7 +235,7 @@
       <div class="mark"><i></i></div>
       <div>
         <div class="name">Orbodoro</div>
-        <div class="sub">Carlosity Teaches</div>
+        <div class="sub">By Carlosity</div>
       </div>
     </div>
     <button class="install" id="install" hidden>Install app</button>
@@ -242,9 +263,23 @@
   <!-- timer -->
   <section class="timer" id="timer">
     <div class="phase" id="phase">Focus</div>
-    <div class="clock" id="clock">25:00</div>
-    <div class="doing" id="doing">No specific pomodoro selected</div>
-    <div class="bar"><i id="fill"></i></div>
+
+    <div class="ring">
+      <svg viewBox="0 0 340 340" role="img" aria-labelledby="ringLabel">
+        <title id="ringLabel">Session progress</title>
+        <g id="slots"></g>
+        <circle class="track" cx="170" cy="170" r="132"></circle>
+        <circle class="arc" id="arc" cx="170" cy="170" r="132"></circle>
+        <circle class="sat-halo" id="satHalo" cx="170" cy="38" r="13"></circle>
+        <circle class="sat" id="sat" cx="170" cy="38" r="6"></circle>
+      </svg>
+      <div class="readout">
+        <div class="clock" id="clock">25:00</div>
+        <div class="doing" id="doing">No specific pomodoro selected</div>
+      </div>
+    </div>
+
+    <div class="slots-label" id="slotsLabel">0 of 12 today</div>
     <div class="controls">
       <button class="go" id="go">Start</button>
       <button class="flat" id="reset">Reset</button>
@@ -329,7 +364,7 @@
   </details>
 
   <p class="foot dl"><a href="https://github.com/programmer1747/carlosity-pomodoro/releases/latest" target="_blank" rel="noopener">Download the Windows app</a></p>
-  <p class="foot">Carlosity Teaches · math + physics</p>
+  <p class="foot">By Carlosity · math + physics</p>
 </div>
 
 <script>
@@ -697,6 +732,33 @@ function ping(text){
   try{ if(Notification.permission === "granted") new Notification("Orbodoro", {body:text, icon:"icon-192.png"}); }catch(e){}
 }
 
+/* ---------------- the orbit ---------------- */
+const R = 132, CIRC = 2 * Math.PI * R;
+$("arc").style.strokeDasharray = CIRC;
+
+// Twelve markers around the outside, one filled per pomodoro finished today.
+(function buildSlots(){
+  const g = $("slots");
+  for(let i = 0; i < 12; i++){
+    const a = (-90 + i*30) * Math.PI/180;
+    const c = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+    c.setAttribute("cx", 170 + Math.cos(a)*157);
+    c.setAttribute("cy", 170 + Math.sin(a)*157);
+    c.setAttribute("r", 3.2);
+    c.setAttribute("class", "slot");
+    g.appendChild(c);
+  }
+})();
+
+function paintSlots(){
+  const n = S.pomsByDate[today()] || 0;
+  const filled = Math.min(12, n);
+  document.querySelectorAll(".slot").forEach((el,i) => el.classList.toggle("on", i < filled));
+  $("slotsLabel").textContent = n > 12
+    ? n + " pomodoros today, past a full orbit"
+    : filled + " of 12 today";
+}
+
 /* ---------------- painting ---------------- */
 function paintTotals(){
   const k = today();
@@ -716,7 +778,12 @@ function paintTimer(){
   const color = phase === "work" ? "var(--study)" : "var(--rest)";
   $("timer").style.setProperty("--phase", color);
 
-  $("fill").style.width = (done*100).toFixed(2) + "%";
+  $("arc").style.strokeDashoffset = CIRC * (1 - done);
+  const a = (-90 + done*360) * Math.PI/180;
+  const x = 170 + Math.cos(a)*R, y = 170 + Math.sin(a)*R;
+  $("sat").setAttribute("cx", x);     $("sat").setAttribute("cy", y);
+  $("satHalo").setAttribute("cx", x); $("satHalo").setAttribute("cy", y);
+
   $("clock").textContent = mmss(remaining);
 
   const label = phase === "work" ? "Focus" : phase === "short" ? "Short break" : "Long break";
@@ -877,7 +944,7 @@ function paintPlanSum(){
     + (((h + 11) % 12) + 1) + ":" + m + " " + (h >= 12 ? "pm" : "am");
 }
 
-const paintAll = () => { paintTotals(); paintTimer(); paintItems(); paintPlan(); };
+const paintAll = () => { paintTotals(); paintTimer(); paintSlots(); paintItems(); paintPlan(); };
 
 /* ---------------- controls ---------------- */
 $("go").onclick = () => {

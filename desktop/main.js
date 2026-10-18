@@ -42,7 +42,7 @@ function createWindow() {
 
 app.whenReady().then(() => {
   Menu.setApplicationMenu(null);
-  if (process.platform === "win32") app.setAppUserModelId("com.carlosityteaches.orbodoro");
+  if (process.platform === "win32") app.setAppUserModelId("com.carlosity.orbodoro");
   createWindow();
 
   app.on("activate", () => {
