@@ -34,21 +34,39 @@ Four moments each get their own sound, chosen from ten built in tones or turned 
 The tones are generated in the browser, so there are no sound files to load and they
 work offline.
 
-## How the session planner allots time
+## Make my pomodoro
 
-Give it a budget, say 90 minutes, and it decides the shape of the session from the
-difficulty tapped onto each specific pomodoro, the L / M / H badge.
+You do not have to guess at the lengths. Give it two things, the minutes you have and
+how sharp you feel, and it reads the difficulty off your specific pomodoros and works
+the rest out.
 
-| Difficulty | Block      | Break after | Share of the time |
-| ---------- | ---------- | ----------- | ----------------- |
-| Light      | 0.6x focus | 0.8x break  | 1                 |
-| Medium     | 1x focus   | 1x break    | 2                 |
-| Heavy      | 1.7x focus | 1.6x break  | 3.2               |
+**The block length** starts from how hard the work is, averaged across everything open
+on your list: light sits near 20 minutes, medium near 25, heavy stretches to 40. Then
+how you feel scales it:
 
-Each block goes to whichever one is furthest behind its share, so a heavy task ends up
-with roughly three times the minutes of a light one. The plan always adds up to exactly
-the budget, and any remainder too small for its own block is folded into the last one.
-Press Start once and it runs the whole thing, switching the active session at each block.
+| Feeling | Blocks     | Breaks      | Long break every |
+| ------- | ---------- | ----------- | ---------------- |
+| Fried   | 0.7x       | 1.3x longer | 3 blocks         |
+| Okay    | unchanged  | unchanged   | 4 blocks         |
+| Sharp   | 1.25x      | 0.85x       | 5 blocks         |
+
+Breaks come out of the block length, a fifth of it for a short break and three fifths
+for a long one, so they stay in proportion to the work. Blocks are clamped to between
+10 and 60 minutes, and never run longer than the time you actually have.
+
+Medium work while feeling okay lands on 25 / 5 / 15 every 4, the classic setting. Heavy
+work while sharp opens up to 50 minute blocks. Heavy work while fried pulls back to 30
+with a long break every 3.
+
+**Then it lays out the session.** Blocks are shared across your specific pomodoros in
+proportion to difficulty, light 1, medium 2, heavy 3.2, and each one goes to whichever
+is furthest behind its share, so a heavy task ends up with roughly three times the
+minutes of a light one. The plan always adds up to exactly the time you gave it, and
+any remainder too small for its own block is folded into the last one.
+
+Press Start once and it runs the whole thing, switching the active session at each
+block. The lengths it picked are written into Settings, so you can still override any
+of them by hand afterwards.
 
 ## Files
 

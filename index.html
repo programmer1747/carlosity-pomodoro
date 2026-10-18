@@ -195,6 +195,14 @@
   .chips{display:flex;gap:6px;flex-wrap:wrap}
   .chip{padding:9px 11px;font-size:12px;color:var(--dim)}
   .chip:hover{color:var(--text)}
+  .chip.on{color:var(--ink);background:var(--study);border-color:var(--study)}
+  .chip.on:hover{color:var(--ink);background:var(--study);filter:brightness(1.08)}
+  .made{
+    margin:14px 0 0;padding:12px;border:1px solid var(--line);background:var(--bg);
+    font-size:13px;line-height:1.6
+  }
+  .made b{color:var(--study);font-weight:600}
+  .made .why{display:block;margin-top:6px;font-size:12px;color:var(--dim)}
   .plan-go{padding:10px 16px;font-size:12px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;background:var(--rest);border-color:var(--rest);color:var(--ink)}
   .plan-go:hover{background:var(--rest);filter:brightness(1.1)}
   .segs{list-style:none;margin:12px 0 0;padding:0}
@@ -302,9 +310,10 @@
   </section>
 
   <!-- plan -->
-  <details id="planBox">
-    <summary>Plan a session</summary>
+  <details id="planBox" open>
+    <summary>Make my pomodoro</summary>
     <div class="pad">
+
       <div class="row" style="align-items:flex-end">
         <div class="fld">
           <label class="cap" for="budget">Minutes I have</label>
@@ -316,9 +325,23 @@
           <button class="chip" data-min="90">1h 30</button>
           <button class="chip" data-min="120">2h</button>
         </div>
-        <button class="plan-go" id="makePlan">Plan</button>
+      </div>
+
+      <div class="fld" style="margin-top:16px">
+        <span class="cap">How sharp do you feel</span>
+        <div class="chips" id="energy">
+          <button class="chip" data-energy="low">Fried</button>
+          <button class="chip" data-energy="mid">Okay</button>
+          <button class="chip" data-energy="high">Sharp</button>
+        </div>
+      </div>
+
+      <div class="row" style="margin-top:16px">
+        <button class="plan-go" id="makePlan">Make my pomodoro</button>
         <button class="flat" id="dropPlan" hidden>Clear</button>
       </div>
+
+      <p class="made" id="madeBox" hidden></p>
       <ul class="segs" id="segList"></ul>
       <p class="plan-sum" id="planSum"></p>
     </div>
@@ -387,7 +410,7 @@ const blank = {
   settings:{
     work:25, short:5, long:15, every:4,
     auto:false, notify:false,
-    theme:"midnight",
+    theme:"midnight", energy:"mid",
     sounds:{ start:"marimba", stop:"click", end:"chime", cont:"blip" }
   },
   studySec:0, restSec:0,
@@ -606,6 +629,59 @@ function buildPlan(budget){
     last.secs += Math.min(spare, last.secs*0.5) * 60;
   }
   return {plan:{budget, segs, i:0}};
+}
+
+/* ---------------- working out the pomodoro ----------------
+   You give it the time you have and how sharp you feel. It reads the difficulty off
+   your specific pomodoros and works out the block and break lengths from there, so
+   the lengths are an output rather than something you have to guess at. */
+const ENERGY = {
+  low: {name:"Fried", block:0.7,  brk:1.3,  every:3},
+  mid: {name:"Okay",  block:1,    brk:1,    every:4},
+  high:{name:"Sharp", block:1.25, brk:0.85, every:5}
+};
+
+function workOutSetup(budget){
+  const open = S.items.filter(i => !i.done);
+  const avg = open.length ? open.reduce((a,i) => a + i.diff, 0) / open.length : 2;
+
+  // light work sits near 20 minutes, medium near 25, heavy stretches to 40
+  const base = avg <= 2 ? 20 + (avg - 1) * 5 : 25 + (avg - 2) * 15;
+  const e = ENERGY[S.settings.energy] || ENERGY.mid;
+
+  let focus = Math.round(base * e.block / 5) * 5;
+  focus = Math.max(10, Math.min(60, focus));
+  // never hand out a block longer than the time available
+  if(budget > 0 && budget < focus) focus = Math.max(10, Math.floor(budget / 5) * 5);
+
+  const short = Math.max(3,  Math.min(15, Math.round(focus * 0.2 * e.brk)));
+  const long  = Math.max(10, Math.min(30, Math.round(focus * 0.6 * e.brk)));
+
+  return {focus, short, long, every:e.every, avg, hasItems:open.length > 0};
+}
+
+function applySetup(cfg){
+  S.settings.work  = cfg.focus;
+  S.settings.short = cfg.short;
+  S.settings.long  = cfg.long;
+  S.settings.every = cfg.every;
+  $("sWork").value = cfg.focus;
+  $("sShort").value = cfg.short;
+  $("sLong").value = cfg.long;
+  $("sEvery").value = cfg.every;
+}
+
+function describeSetup(cfg){
+  const e = ENERGY[S.settings.energy] || ENERGY.mid;
+  const load = cfg.avg <= 1.5 ? "light" : cfg.avg >= 2.5 ? "heavy" : "medium";
+  const why = cfg.hasItems
+    ? "Your list looks " + load + " and you said " + e.name.toLowerCase() + "."
+    : "Nothing on the list yet, so it assumed medium work and you said " + e.name.toLowerCase() + ".";
+  return {
+    head: cfg.focus + " minute blocks, " + cfg.short + " minute breaks, "
+        + cfg.long + " minute long break every " + cfg.every,
+    why
+  };
 }
 
 const planSeg = () => (S.plan && S.plan.i < S.plan.segs.length) ? S.plan.segs[S.plan.i] : null;
@@ -907,11 +983,11 @@ function paintPlan(){
   const p = S.plan, list = $("segList");
   list.innerHTML = "";
   $("dropPlan").hidden = !p;
-  $("makePlan").textContent = p ? "Re-plan" : "Plan";
+  $("makePlan").textContent = p ? "Make it again" : "Make my pomodoro";
 
   if(!p){
     $("planSum").className = "plan-sum";
-    $("planSum").textContent = "Say how long you have. Blocks get sized by difficulty, and the harder ones get more of the time.";
+    $("planSum").textContent = "Say how long you have and how sharp you feel. It works out the block and break lengths, then lays the session out for you.";
     return;
   }
 
@@ -985,8 +1061,28 @@ function addItem(){
 
 /* ---------------- plan controls ---------------- */
 $("makePlan").onclick = () => {
-  const out = buildPlan(clean($("budget").value) || 0);
+  const budget = clean($("budget").value) || 0;
+
+  // decide the lengths from the inputs, then build the session on top of them
+  const cfg = workOutSetup(budget);
+  applySetup(cfg);
+  const said = describeSetup(cfg);
+  $("madeBox").hidden = false;
+  $("madeBox").innerHTML = "";
+  const head = document.createElement("b");
+  head.textContent = said.head;
+  const why = document.createElement("span");
+  why.className = "why";
+  why.textContent = said.why;
+  $("madeBox").append(head, why);
+
+  const out = buildPlan(budget);
   if(out.error){
+    // the lengths still applied, there was just nothing to schedule them across
+    S.plan = null;
+    running = false;
+    phase = "work"; remaining = phaseLen("work"); carry = 0;
+    save(); paintAll();
     $("planSum").className = "plan-sum warn";
     $("planSum").textContent = out.error;
     return;
@@ -996,7 +1092,21 @@ $("makePlan").onclick = () => {
   syncToSeg();
   save(); paintAll();
 };
+
+function paintEnergy(){
+  document.querySelectorAll("#energy .chip").forEach(b =>
+    b.classList.toggle("on", b.dataset.energy === S.settings.energy));
+}
+$("energy").onclick = e => {
+  const b = e.target.closest(".chip");
+  if(!b) return;
+  S.settings.energy = b.dataset.energy;
+  paintEnergy();
+  save();
+  if(S.plan || !$("madeBox").hidden) $("makePlan").click();
+};
 $("dropPlan").onclick = () => {
+  $("madeBox").hidden = true;
   S.plan = null; running = false;
   phase = "work"; remaining = phaseLen("work"); carry = 0;
   save(); paintAll();
@@ -1053,6 +1163,7 @@ addEventListener("appinstalled", () => { installer = null; $("install").hidden =
 
 /* ---------------- boot ---------------- */
 applyTheme(S.settings.theme);
+paintEnergy();
 if(S.plan) syncToSeg();
 paintAll();
 
