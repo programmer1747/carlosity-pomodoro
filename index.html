@@ -135,6 +135,8 @@
   .go:hover{background:var(--phase,var(--study));filter:brightness(1.1)}
   .flat{padding:12px 16px;font-size:12.5px;color:var(--dim)}
   .flat:hover{color:var(--text)}
+  .flat:disabled{opacity:.28;cursor:not-allowed}
+  .flat:disabled:hover{color:var(--dim)}
   .nudge{display:flex;gap:6px;justify-content:center;flex-wrap:wrap;margin-top:9px}
   .nudge button{
     padding:9px 14px;font-size:12.5px;font-variant-numeric:tabular-nums;
@@ -300,6 +302,7 @@
     <div class="controls">
       <button class="go" id="go">Start</button>
       <button class="flat" id="reset">Reset</button>
+      <button class="flat" id="back" title="Go back to the block before this one">Back</button>
       <button class="flat" id="skip">Skip</button>
     </div>
     <div class="nudge">
@@ -889,6 +892,7 @@ const phaseLen = p => (p === "work" ? S.settings.work : p === "short" ? S.settin
 // Time added to the block has to lengthen the block as well as the countdown, or the
 // ring would jump backwards. For a planned block the segment itself grows, so the
 // schedule below the timer stays honest about what it now costs.
+let history = [];                   // one mark per advance, so Back can walk back
 let addedSec = 0;                   // negative once time has been taken off
 const MAX_PHASE = 240 * 60;         // a block tops out at four hours
 const MIN_PHASE = 60;               // and never shrinks below a minute
@@ -942,6 +946,14 @@ setInterval(loop, 250);
 
 function finishPhase(){
   const wasWork = phase === "work";
+
+  // Mark the position we are leaving so Back can return to it. The plan object comes
+  // along too, so a plan that runs out can still be stepped back into.
+  const mark = {
+    phase, plan: S.plan, planIndex: S.plan ? S.plan.i : null,
+    activeId: S.activeId, inCycle: S.inCycle, pom: null
+  };
+
   if(wasWork){
     const k = today();
     S.poms += 1;
@@ -949,7 +961,10 @@ function finishPhase(){
     S.inCycle += 1;
     const it = activeItem();
     if(it) it.poms += 1;
+    mark.pom = { itemId: it ? it.id : null, key: k };
   }
+  history.push(mark);
+  if(history.length > 100) history.shift();
 
   let planDone = false, nextName = "";
   if(S.plan){
@@ -1054,6 +1069,7 @@ function paintTimer(){
   }
   $("phase").textContent = tag;
 
+  $("back").disabled = !canBack();
   $("add1").disabled = !canShift(1);
   $("add5").disabled = !canShift(5);
   $("sub1").disabled = !canShift(-1);
@@ -1229,6 +1245,44 @@ $("reset").onclick = () => {
 };
 $("skip").onclick = () => { remaining = 0; finishPhase(); };
 
+// Back is for a block you moved on from too early, so you can pick it up again rather
+// than let a fresh one start. Logged study and rest time is left alone, because that
+// time was really spent. A pomodoro counted by the step being reversed is taken back,
+// which is what makes an accidental Skip harmless.
+const canBack = () => history.length > 0;
+
+function goBack(){
+  const mark = history.pop();
+  if(!mark) return;
+
+  // undo the pomodoro that this exact step counted, if it counted one
+  if(mark.pom){
+    const k = mark.pom.key;
+    S.poms = Math.max(0, S.poms - 1);
+    S.pomsByDate[k] = Math.max(0, (S.pomsByDate[k] || 0) - 1);
+    const it = S.items.find(x => x.id === mark.pom.itemId);
+    if(it) it.poms = Math.max(0, it.poms - 1);
+  }
+
+  if(mark.plan){
+    S.plan = mark.plan;                 // back into the plan, even if it had run out
+    S.plan.i = mark.planIndex;
+    syncToSeg();
+  } else {
+    S.plan = null;
+    phase = mark.phase;                 // free running, restore the phase we left
+    S.activeId = mark.activeId;
+    S.inCycle = mark.inCycle;
+    addedSec = 0;
+    remaining = phaseLen(phase);
+    carry = 0;
+  }
+
+  running = false;
+  save(); paintAll();
+}
+$("back").onclick = goBack;
+
 // Adding or taking off time moves the block length as well as the countdown. Shifting
 // only the countdown would put the ring out of step with the block it is measuring.
 function canShift(mins){
@@ -1300,6 +1354,7 @@ $("makePlan").onclick = () => {
   }
   S.plan = out.plan;
   running = false;
+  history = [];
   syncToSeg();
   save(); paintAll();
 };
@@ -1341,7 +1396,7 @@ $("energy").onclick = e => {
 };
 $("dropPlan").onclick = () => {
   $("madeBox").hidden = true;
-  S.plan = null; running = false; addedSec = 0;
+  S.plan = null; running = false; addedSec = 0; history = [];
   phase = startPhase(); remaining = phaseLen(phase); carry = 0;
   save(); paintAll();
 };
@@ -1388,7 +1443,8 @@ $("wipe").onclick = () => {
   const theme = S.settings.theme, sounds = S.settings.sounds;
   S = JSON.parse(JSON.stringify(blank));
   S.settings.theme = theme; S.settings.sounds = sounds;
-  phase = startPhase(); running = false; addedSec = 0; remaining = phaseLen(phase); carry = 0;
+  phase = startPhase(); running = false; addedSec = 0; history = [];
+  remaining = phaseLen(phase); carry = 0;
   save(); paintAll();
 };
 

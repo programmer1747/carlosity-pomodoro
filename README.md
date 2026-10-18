@@ -17,10 +17,32 @@ what you are working on so you can come back to it later and keep adding to its 
 - Four separate sounds you can set yourself: start, stop, continue and end
 - Start on a focus block or warm up with a break, your choice
 - Minus and plus buttons to stretch or trim a block while it is running
+- Back, to return to a block you moved on from instead of letting a new one start
 - Six themes
 - Session planner that sizes blocks by task difficulty and fits them to the time you have
 - Everything saves locally, so closing the app or the tab does not wipe your totals
 - Runs in a browser, installs as an app, or runs as a downloaded Windows program
+
+## Going back
+
+**Back**, between Reset and Skip, returns to the block you were on before this one.
+For when you skipped too early, or a block ended and you want to pick it up again
+rather than let a whole new one start.
+
+It walks back as far as you came: through a plan segment by segment, and into a plan
+that had already run out. Each step restores the position you left, the block at its
+full length, paused and ready.
+
+Two things it deliberately does and does not undo. Study and rest time stays logged,
+because that time was really spent, and the totals should not move because you changed
+your mind about which block you were on. A pomodoro counted by the step being reversed
+is taken back though, on the task as well as the overall count, which is what makes a
+mistimed Skip harmless rather than quietly inflating your numbers. Each Back undoes
+only its own step, so walking back three blocks takes back exactly the pomodoros those
+three steps counted.
+
+Back switches off when there is nothing behind you, and a new plan or Clear starts the
+trail fresh.
 
 ## Adjusting a block
 
