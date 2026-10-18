@@ -135,6 +135,10 @@
   .go:hover{background:var(--phase,var(--study));filter:brightness(1.1)}
   .flat{padding:12px 16px;font-size:12.5px;color:var(--dim)}
   .flat:hover{color:var(--text)}
+  .add{padding:12px 14px;font-variant-numeric:tabular-nums;color:var(--phase,var(--study))}
+  .add:hover{color:var(--ink);background:var(--phase,var(--study));border-color:var(--phase,var(--study))}
+  .add:disabled{opacity:.3;cursor:not-allowed}
+  .add:disabled:hover{color:var(--phase,var(--study));background:transparent;border-color:var(--line)}
 
   /* ---------------- blocks ---------------- */
   .block{margin-top:20px;border:1px solid var(--line);background:var(--card)}
@@ -293,6 +297,8 @@
       <button class="go" id="go">Start</button>
       <button class="flat" id="reset">Reset</button>
       <button class="flat" id="skip">Skip</button>
+      <button class="flat add" id="add1" title="Add a minute to this block">+1</button>
+      <button class="flat add" id="add5" title="Add five minutes to this block">+5</button>
     </div>
   </section>
 
@@ -847,6 +853,7 @@ function syncToSeg(){
   if(g.kind === "work" && g.itemId) S.activeId = g.itemId;
   remaining = g.secs;
   carry = 0;
+  addedSec = 0;
 }
 
 function dropFromPlan(id){
@@ -871,7 +878,12 @@ function dropFromPlan(id){
 const startPhase = () => S.settings.startRest ? "short" : "work";
 let phase = startPhase();           // work | short | long
 const phaseLen = p => (p === "work" ? S.settings.work : p === "short" ? S.settings.short : S.settings.long) * 60;
-const curLen = () => { const g = planSeg(); return g ? g.secs : phaseLen(phase); };
+// Time added to the block has to lengthen the block as well as the countdown, or the
+// ring would jump backwards. For a planned block the segment itself grows, so the
+// schedule below the timer stays honest about what it now costs.
+let addedSec = 0;
+const MAX_PHASE = 240 * 60;
+const curLen = () => { const g = planSeg(); return g ? g.secs : phaseLen(phase) + addedSec; };
 let remaining = phaseLen(phase);
 let running = false;
 let lastStamp = 0;
@@ -949,6 +961,7 @@ function finishPhase(){
   running = planDone ? false : (S.plan ? true : !!S.settings.auto);
   lastStamp = Date.now();
   carry = 0;
+  addedSec = 0;
   save();
   cue("end");
   ping(planDone ? "Plan finished, every block done."
@@ -1025,7 +1038,12 @@ function paintTimer(){
     tag += phase === "work" ? " · block " + step + " of " + total
                             : " · " + Math.max(0, total - step) + " to go";
   }
+  if(addedSec > 0) tag += " · +" + Math.round(addedSec / 60) + "m";
   $("phase").textContent = tag;
+
+  const noRoom = curLen() >= MAX_PHASE;
+  $("add1").disabled = noRoom || curLen() + 60 > MAX_PHASE;
+  $("add5").disabled = noRoom || curLen() + 300 > MAX_PHASE;
 
   const it = activeItem();
   $("doing").textContent = phase === "work"
@@ -1192,10 +1210,22 @@ $("go").onclick = () => {
   save(); paintTimer();
 };
 $("reset").onclick = () => {
-  running = false; remaining = curLen(); carry = 0;
-  save(); paintTimer();
+  running = false; addedSec = 0; remaining = curLen(); carry = 0;
+  save(); paintAll();
 };
 $("skip").onclick = () => { remaining = 0; finishPhase(); };
+
+function extend(mins){
+  const secs = mins * 60;
+  if(curLen() + secs > MAX_PHASE) return;
+  remaining += secs;
+  addedSec += secs;
+  const g = planSeg();
+  if(g) g.secs += secs;
+  save(); paintAll();
+}
+$("add1").onclick = () => extend(1);
+$("add5").onclick = () => extend(5);
 
 $("addItem").onclick = addItem;
 $("newItem").onkeydown = e => { if(e.key === "Enter") addItem(); };
@@ -1285,7 +1315,7 @@ $("energy").onclick = e => {
 };
 $("dropPlan").onclick = () => {
   $("madeBox").hidden = true;
-  S.plan = null; running = false;
+  S.plan = null; running = false; addedSec = 0;
   phase = startPhase(); remaining = phaseLen(phase); carry = 0;
   save(); paintAll();
 };
@@ -1332,7 +1362,7 @@ $("wipe").onclick = () => {
   const theme = S.settings.theme, sounds = S.settings.sounds;
   S = JSON.parse(JSON.stringify(blank));
   S.settings.theme = theme; S.settings.sounds = sounds;
-  phase = startPhase(); running = false; remaining = phaseLen(phase); carry = 0;
+  phase = startPhase(); running = false; addedSec = 0; remaining = phaseLen(phase); carry = 0;
   save(); paintAll();
 };
 
