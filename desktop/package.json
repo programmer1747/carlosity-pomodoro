@@ -1,7 +1,7 @@
 {
   "name": "orbodoro",
   "productName": "Orbodoro",
-  "version": "1.0.9",
+  "version": "1.1.0",
   "description": "Orbodoro, a pomodoro timer that tracks study time, rest time and named sessions. By Carlosity.",
   "author": "Carlos Alvarez",
   "private": true,

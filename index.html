@@ -97,9 +97,9 @@
   .tile{background:var(--card);padding:14px 14px 13px;min-width:0}
   .tile b{
     display:block;font-size:25px;font-weight:600;margin-top:8px;
-    font-variant-numeric:tabular-nums;line-height:1.1;color:var(--dim)
+    font-variant-numeric:tabular-nums;line-height:1.1;color:var(--text)
   }
-  .tile .tsub{display:block;font-size:11.5px;color:var(--text);margin-top:5px;font-variant-numeric:tabular-nums}
+  .tile .tsub{display:block;font-size:11.5px;color:var(--dim);margin-top:5px;font-variant-numeric:tabular-nums}
 
   /* ---------------- timer ---------------- */
   .timer{border:1px solid var(--line);border-top:0;background:var(--card);padding:22px 18px 20px;text-align:center}
@@ -265,18 +265,18 @@
   <div class="tiles">
     <div class="tile">
       <span class="cap">Total time</span>
-      <b id="tTotal">0h 00m</b>
-      <span class="tsub" id="tTotalDay">0h 00m today</span>
+      <b id="dayTotal">0h 00m</b>
+      <span class="tsub" id="allTotal">0h 00m all time</span>
     </div>
     <div class="tile study">
       <span class="cap">Study</span>
-      <b id="tStudy">0h 00m</b>
-      <span class="tsub" id="tStudyDay">0h 00m today</span>
+      <b id="dayStudy">0h 00m</b>
+      <span class="tsub" id="allStudy">0h 00m all time</span>
     </div>
     <div class="tile rest">
       <span class="cap">Rest</span>
-      <b id="tRest">0h 00m</b>
-      <span class="tsub" id="tRestDay">0h 00m today</span>
+      <b id="dayRest">0h 00m</b>
+      <span class="tsub" id="allRest">0h 00m all time</span>
     </div>
   </div>
 
@@ -1034,12 +1034,12 @@ function paintTotals(){
   const k = today();
   const sAll = S.studySec, rAll = S.restSec;
   const sDay = S.studyByDate[k] || 0, rDay = S.restByDate[k] || 0;
-  $("tTotal").textContent = hm(sAll + rAll);
-  $("tStudy").textContent = hm(sAll);
-  $("tRest").textContent  = hm(rAll);
-  $("tTotalDay").textContent = hm(sDay + rDay) + " today";
-  $("tStudyDay").textContent = hm(sDay) + " today";
-  $("tRestDay").textContent  = hm(rDay) + " today";
+  $("dayTotal").textContent = hm(sDay + rDay);
+  $("dayStudy").textContent = hm(sDay);
+  $("dayRest").textContent  = hm(rDay);
+  $("allTotal").textContent = hm(sAll + rAll) + " all time";
+  $("allStudy").textContent = hm(sAll) + " all time";
+  $("allRest").textContent  = hm(rAll) + " all time";
 }
 
 function paintTimer(){
